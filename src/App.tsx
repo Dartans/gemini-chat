@@ -1,26 +1,27 @@
 import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import ApiKeyInput from './components/ApiKeyInput';
+import ChatInterface from './components/ChatInterface';
+import useCookie from './hooks/useCookie';
+import './App.css'; // Create this CSS file
 
-function App() {
+const App: React.FC = () => {
+  const [apiKey] = useCookie('geminiApiKey');
+  const [hasApiKey, setHasApiKey] = React.useState(!!apiKey);
+
+  const handleApiKeySubmit = () => {
+    setHasApiKey(true);
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="app">
+      <h1>Gemini Chat</h1>
+      {!hasApiKey ? (
+        <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
+      ) : (
+        <ChatInterface />
+      )}
     </div>
   );
-}
+};
 
 export default App;

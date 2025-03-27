@@ -1,0 +1,36 @@
+.message {
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    border-radius: 20px;
+    clear: both;
+    font-size: 1rem;
+    line-height: 1.4;
+    max-width: 80%; /* Prevent long messages from taking up the whole width */
+  }
+  
+  .message.user {
+    background-color: #dcf8c6; /* Light green for user messages */
+    color: #333;
+    float: right;
+    text-align: right;
+    border-bottom-right-radius: 0;
+  }
+  
+  .message.ai {
+    background-color: #f0f0f0; /* Light gray for AI messages */
+    color: #333;
+    float: left;
+    text-align: left;
+    border-bottom-left-radius: 0;
+  }
+  
+  .message-content {
+    word-wrap: break-word;
+  }
+  
+  .message-timestamp {
+    font-size: 0.7rem;
+    color: #777;
+    margin-top: 5px;
+    display: block; /* Ensure timestamp is on a new line */
+  }

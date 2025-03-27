@@ -1,0 +1,36 @@
+/* ChatInterface.css */
+.chat-interface {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Or your desired height */
+}
+
+.system-instruction-container {
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+.system-instruction-container label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.system-instruction-container textarea {
+  width: 100%;
+  min-height: 50px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-family: sans-serif; /* Ensure consistent font */
+  font-size: 1rem;
+}
+
+.chat-container {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+/* ... other styles ... */
