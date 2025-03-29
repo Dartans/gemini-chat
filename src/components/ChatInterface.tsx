@@ -5,7 +5,7 @@ import MessageItem from './Message'; // Changed import name
 import MessageInput from './MessageInput';
 import LoadingIndicator from './LoadingIndicator';
 import { chatWithGemini } from '../services/aiService';
-import './ChatInterface.css'; // Create this CSS file
+import './ChatInterface.css';
 
 interface ChatConfig {
   systemInstruction: string;

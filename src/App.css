@@ -1,11 +1,12 @@
+/* App.css (or wherever your app styles are) */
 .app {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Modern, clean font */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 30px;
-  background-color: #f4f4f4; /* Light background for the overall app */
-  min-height: 100vh; /* Ensure the background covers the whole viewport */
+  /* Removed align-items: center; */
+  padding: 0; /* Removed padding */
+  background-color: #f4f4f4;
+  min-height: 100vh;
 }
 
 .app h1 {

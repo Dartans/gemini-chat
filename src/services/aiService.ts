@@ -1,9 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import Cookies from 'js-cookie';
 
-const apiKeyFromCookie = Cookies.get('geminiApiKey');
-const genAI = new GoogleGenAI({ apiKey: apiKeyFromCookie });
-
 interface ChatConfig {
   systemInstruction: string;
 }
@@ -13,6 +10,8 @@ export const chatWithGemini = async (apiKey: string | undefined, message: string
     console.error('Gemini API key not found.');
     return null;
   }
+
+  const genAI = new GoogleGenAI({ apiKey: apiKey });
 
   try {
     const response = await genAI.models.generateContent({

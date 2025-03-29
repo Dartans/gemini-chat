@@ -14,7 +14,6 @@ const App: React.FC = () => {
 
   return (
     <div className="app">
-      <h1>Gemini Chat</h1>
       {!hasApiKey ? (
         <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />
       ) : (
