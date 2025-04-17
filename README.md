@@ -1,7 +1,7 @@
 
 Get key
 
-https://ai.google.dev/gemini-api/docs/quickstart?lang=node
+https://aistudio.google.com/app/apikey
 
 Use key
 
