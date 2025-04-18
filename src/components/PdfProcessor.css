@@ -1,0 +1,280 @@
+.pdf-processor {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  max-width: 1000px; /* Increased to accommodate the sidebar */
+  margin: 20px auto;
+  padding: 20px;
+}
+
+.pdf-processor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.pdf-processor-header h2 {
+  margin: 0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+
+.close-button:hover {
+  color: #000;
+}
+
+.pdf-processor-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.file-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative; /* Added for absolute positioning of success message */
+}
+
+.file-upload input[type="file"] {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.file-upload button {
+  padding: 10px 15px;
+  background-color: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Style for the save button */
+.file-upload .save-button {
+  background-color: #4caf50; /* Green color to differentiate from the blue process button */
+  margin-top: 5px;
+}
+
+.file-upload .save-button:hover {
+  background-color: #388e3c; /* Darker green on hover */
+}
+
+.file-upload button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.file-upload button:hover:not(:disabled) {
+  background-color: #1565c0;
+}
+
+/* Success message styling */
+.success-message {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 10px;
+  padding: 8px 16px;
+  background-color: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  border-radius: 4px;
+  color: #2e7d32;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease-out;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.error-message {
+  padding: 10px;
+  background-color: #ffebee;
+  border: 1px solid #ffcdd2;
+  border-radius: 4px;
+  color: #c62828;
+}
+
+.results {
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 15px;
+  background-color: #f5f5f5;
+  overflow-x: auto;
+}
+
+.results pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pdf-viewer-container {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+/* New wrapper for side-by-side view */
+.pdf-viewer-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  width: 100%;
+}
+
+.pdf-viewer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0; /* Allow flexbox to shrink below content width */
+}
+
+.pdf-controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  align-items: center;
+}
+
+.pdf-document-container {
+  position: relative;
+  margin: 0 auto;
+}
+
+.bounding-boxes-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  cursor: crosshair; /* Change cursor to indicate selection possibility */
+  pointer-events: auto; /* Allow mouse events to be captured by default */
+}
+
+/* Styling for the sidebar editor */
+.box-editor-sidebar {
+  flex: 0 0 250px; /* Fixed width sidebar */
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.box-editor-sidebar h3 {
+  margin-top: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.box-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.coordinate-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coordinate-inputs label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+}
+
+.coordinate-inputs input {
+  width: 70px;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: right;
+}
+
+.selected-text {
+  padding: 8px;
+  background-color: #e3f2fd;
+  border-left: 3px solid #2196f3;
+  font-style: italic;
+  margin: 0;
+  word-break: break-word;
+}
+
+.editing-help {
+  background-color: #fff3e0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border-left: 3px solid #ff9800;
+  margin-top: 10px;
+}
+
+.help-text {
+  margin: 0;
+  font-size: 0.9em;
+}
+
+.help-text ul {
+  margin: 5px 0 0 0;
+  padding-left: 20px;
+}
+
+.help-text li {
+  margin-bottom: 3px;
+}
+
+.no-selection {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* Styling for selected box in results list */
+.selected-box-result {
+  background-color: #e3f2fd;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.page-results li {
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 2px;
+}
+
+.page-results li:hover {
+  background-color: #f0f0f0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .pdf-viewer-wrapper {
+    flex-direction: column;
+  }
+  
+  .box-editor-sidebar {
+    flex: none;
+    width: 100%;
+  }
+}
