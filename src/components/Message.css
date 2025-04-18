@@ -6,6 +6,9 @@
     font-size: 1rem;
     line-height: 1.4;
     max-width: 80%; /* Prevent long messages from taking up the whole width */
+    cursor: pointer; /* Make message boxes appear clickable */
+    transition: all 0.2s ease;
+    position: relative;
   }
   
   .message.user {
@@ -22,6 +25,12 @@
     float: left;
     text-align: left;
     border-bottom-left-radius: 0;
+  }
+
+  .message.selected {
+    box-shadow: 0 0 0 2px #0078d4, 0 0 10px rgba(0, 120, 212, 0.4);
+    transform: scale(1.02);
+    z-index: 10;
   }
   
   .message-content {
