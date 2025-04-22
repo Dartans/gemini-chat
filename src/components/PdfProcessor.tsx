@@ -6,8 +6,11 @@ import { processPdfWithGemini } from '../services/aiService';
 import { BoundingBox, PdfResults } from '../types/pdfTypes';
 import './PdfProcessor.css';
 
-// Configure pdf.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdfjs/pdf.worker.min.js`;
+// Configure pdf.js worker using import.meta.url for better module resolution
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
 
 interface PdfProcessorProps {
   onClose: () => void;
