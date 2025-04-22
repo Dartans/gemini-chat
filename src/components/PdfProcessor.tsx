@@ -491,7 +491,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     getSelectedBox: () => selectedBox
   }));
 
-  // Function to save bounding box data to cookie
+  // Function to save bounding box data to a local JSON file
   const saveBoundingBoxData = () => {
     if (!parsedResults || !rawPdfData || !file) {
       setError("Missing PDF data or bounding boxes to save");
@@ -511,39 +511,19 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     };
 
     try {
-      // Get existing saved PDFs data (as an object of id -> data)
-      let existingData: Record<string, any> = {};
-      try {
-        existingData = JSON.parse(pdfBoundingBoxes || '{}');
-        // Convert from old format (single PDF) to new format (object of PDFs) if needed
-        if ('id' in existingData && !existingData[existingData.id as string]) {       
-          existingData = { [(existingData as any).id]: existingData };
-        }
-      } catch (e) {
-        console.error("Error parsing existing PDF data, starting fresh:", e);
-        existingData = {};
-      }
-
-      // Add/update this PDF data
-      existingData[pdfId] = boundingBoxData;
+      // Convert data to JSON string
+      const jsonData = JSON.stringify(boundingBoxData, null, 2);
       
-      // Save the updated object with all PDFs
-      setPdfBoundingBoxes(JSON.stringify(existingData), { expires: 30 }); // expires in 30 days
+      // Create a blob with the JSON data
+      const blob = new Blob([jsonData], { type: 'application/json' });
       
-      // Update the list of saved PDFs
-      const savedPdfsList = JSON.parse(savedPdfs || '[]');
-      const updatedList = [
-        ...savedPdfsList,
-        {
-          id: pdfId,
-          fileName: file.name,
-          timestamp: new Date().toISOString()
-        }
-      ];
-      
-      // Keep only the last 10 entries to avoid cookie size limits
-      const trimmedList = updatedList.slice(-10);
-      setSavedPdfs(JSON.stringify(trimmedList), { expires: 30 });
+      // Create a download link and trigger the download
+      const downloadLink = document.createElement('a');
+      downloadLink.href = URL.createObjectURL(blob);
+      downloadLink.download = `${file.name.replace(/\.[^/.]+$/, '')}-bounding-boxes.json`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
       
       // Show success message
       setSaveSuccess(true);
@@ -552,6 +532,78 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     } catch (err) {
       setError(`Failed to save data: ${err instanceof Error ? err.message : String(err)}`);
     }
+  };
+
+  // Function to load bounding box data from a local JSON file
+  const loadBoundingBoxData = () => {
+    // Create a hidden file input element
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'application/json';
+    fileInput.style.display = 'none';
+    
+    // Handle file selection
+    fileInput.addEventListener('change', (event) => {
+      const target = event.target as HTMLInputElement;
+      if (!target.files || !target.files[0]) return;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          if (e.target?.result) {
+            // Parse the JSON file
+            const loadedData = JSON.parse(e.target.result as string);
+            
+            // Basic validation
+            if (!loadedData.data || !loadedData.pdfData || !loadedData.fileName) {
+              throw new Error("Invalid bounding box data format");
+            }
+            
+            // Convert base64 back to blob
+            const byteCharacters = atob(loadedData.pdfData);
+            const byteNumbers = new Array(byteCharacters.length);
+            
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'application/pdf' });
+            
+            // Create a File object from the blob
+            const pdfFile = new File([blob], loadedData.fileName, { type: 'application/pdf' });
+            
+            // Set the file and create object URL
+            setFile(pdfFile);
+            const objectUrl = URL.createObjectURL(blob);
+            setPdfUrl(objectUrl);
+            setRawPdfData(loadedData.pdfData);
+            
+            // Set the parsed results directly
+            setParsedResults(loadedData.data);
+            
+            // Notify parent component about loaded boxes if callback provided
+            if (onBoxesLoaded && externalControls) {
+              const allBoxes = loadedData.data.pages.flatMap((page: any) => page.boxes);
+              onBoxesLoaded(allBoxes, null);
+            }
+            
+            // Show success message
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
+          }
+        } catch (err) {
+          setError(`Error loading bounding box data: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      };
+      
+      reader.readAsText(target.files[0]);
+    });
+    
+    // Trigger the file input click
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    document.body.removeChild(fileInput);
   };
 
   // When component mounts or updates with external controls prop change
@@ -595,6 +647,15 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
               Save Bounding Box Data
             </button>
           )}
+
+          {/* Add Load Bounding Box Data button */}
+          <button 
+            onClick={loadBoundingBoxData}
+            className="load-button"
+            title="Load bounding box data from a JSON file"
+          >
+            Load Bounding Box Data
+          </button>
 
           {/* Success message notification */}
           {saveSuccess && (

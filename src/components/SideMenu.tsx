@@ -25,21 +25,10 @@ const SideMenu: React.FC<SideMenuProps> = ({ buttons, systemInstruction, setSyst
   const [savedPdfs] = useCookie('savedPdfs', '[]');
   const [fullRequest, setFullRequest] = React.useState<string>('');
   const [userNameInput, setUserNameInput] = React.useState(userName || '');
-  const [showSavedPdfs, setShowSavedPdfs] = useState(false);
   
   const handleSaveUserName = () => {
     setUserName(userNameInput, { expires: 365 });
   };
-
-  // Parse saved PDFs from cookie
-  const parsedSavedPdfs: SavedPdf[] = React.useMemo(() => {
-    try {
-      return JSON.parse(savedPdfs || '[]') as SavedPdf[];
-    } catch (e) {
-      console.error("Error parsing saved PDFs:", e);
-      return [];
-    }
-  }, [savedPdfs]);
 
   // Format date for display
   const formatDate = (dateString: string): string => {
@@ -94,26 +83,6 @@ const SideMenu: React.FC<SideMenuProps> = ({ buttons, systemInstruction, setSyst
             {btn.label}
           </button>
         ))}
-        <div style={{ marginTop: 16 }}>
-          <button onClick={() => setShowSavedPdfs(!showSavedPdfs)} style={{ width: '100%', padding: 4, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>
-            {showSavedPdfs ? 'Hide Saved PDFs' : 'Show Saved PDFs'}
-          </button>
-          {showSavedPdfs && (
-            <div style={{ marginTop: 8 }}>
-              {parsedSavedPdfs.length === 0 ? (
-                <div style={{ color: '#fff', fontSize: 14 }}>No saved PDFs found.</div>
-              ) : (
-                parsedSavedPdfs.map(pdf => (
-                  <div key={pdf.id} style={{ marginBottom: 8, padding: 8, border: '1px solid #ccc', borderRadius: 4, background: '#333', color: '#fff' }}>
-                    <div style={{ fontSize: 14, fontWeight: 'bold' }}>{pdf.fileName}</div>
-                    <div style={{ fontSize: 12 }}>{formatDate(pdf.timestamp)}</div>
-                    <button onClick={() => handleLoadPdf(pdf.id)} style={{ marginTop: 4, padding: 4, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>Load PDF</button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
       </div>
       <div style={{ flex: 1 }} />
       <div style={{ marginTop: 'auto', background: '#181818', color: '#fff', padding: 10, fontSize: 12, borderTop: '1px solid #333', wordBreak: 'break-all' }}>
