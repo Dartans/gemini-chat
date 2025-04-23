@@ -5,17 +5,9 @@ import PdfProcessor, { PdfProcessorRef } from './components/PdfProcessor';
 import MovementControls from './components/MovementControls';
 import useCookie from './hooks/useCookie';
 import SideMenu, { SideMenuButton } from './components/SideMenu';
-import { BoundingBox } from './types/pdfTypes';
+import Sidebar from './components/Sidebar';
+import { BoundingBox, VariableField } from './types/pdfTypes';
 import './App.css';
-
-const Sidebar: React.FC<React.PropsWithChildren<{ collapsed: boolean; onToggle: () => void }>> = ({ collapsed, onToggle, children }) => (
-  <div className={`sidebar${collapsed ? ' collapsed' : ''}`}>  
-    <button className="sidebar-toggle" onClick={onToggle}>
-      {collapsed ? '>' : '<'}
-    </button>
-    {!collapsed && <div className="sidebar-content">{children}</div>}
-  </div>
-);
 
 const App: React.FC = () => {
   const [apiKey] = useCookie('geminiApiKey');
@@ -38,6 +30,35 @@ const App: React.FC = () => {
   const [selectedBox, setSelectedBox] = useState<BoundingBox | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
+
+  // Add variable fields state
+  const [variableFields, setVariableFields] = useState<VariableField[]>([]);
+  const [isMappingInProgress, setIsMappingInProgress] = useState(false);
+  
+  // Handler for variable fields change
+  const handleVariableFieldsChange = useCallback((fields: VariableField[]) => {
+    setVariableFields(fields);
+    // Update boxes in PdfProcessor if variable field changes affect them (e.g., name change)
+    if (pdfProcessorRef.current?.updateBoxNames) {
+       pdfProcessorRef.current.updateBoxNames(fields);
+    }
+  }, []);
+
+  // Handler for mapping fields
+  const handleMapFields = useCallback(async () => {
+    if (pdfProcessorRef.current && pdfProcessorRef.current.mapFields) {
+      setIsMappingInProgress(true);
+      try {
+        // Pass current fields to mapFields
+        const updatedFields = await pdfProcessorRef.current.mapFields(variableFields);
+        if (updatedFields) {
+          setVariableFields(updatedFields); // Update state with results
+        }
+      } finally {
+        setIsMappingInProgress(false);
+      }
+    }
+  }, [variableFields]);
 
   const handleApiKeySubmit = () => {
     setHasApiKey(true);
@@ -142,35 +163,49 @@ const App: React.FC = () => {
     <div className="app-layout">
       <Sidebar collapsed={sidebarCollapsed} onToggle={handleSidebarToggle}>
         {showPdfProcessor ? (
-          <MovementControls 
-            selectedBox={selectedBox}
-            onCoordinateChange={(field, value) => {
-              if (pdfProcessorRef.current) {
-                const pdfProcessor = pdfProcessorRef.current;
-                const handleCoordinateChange = pdfProcessor.handleCoordinateChange;
-                if (handleCoordinateChange) {
-                  handleCoordinateChange(field, value);
+          <>
+            <SideMenu
+              buttons={[]}
+              systemInstruction={systemInstruction}
+              setSystemInstruction={setSystemInstruction}
+              variableFields={variableFields}
+              onVariableFieldsChange={handleVariableFieldsChange}
+              onMapFields={handleMapFields}
+              isMappingInProgress={isMappingInProgress}
+              showVariableFields={true}
+              isPdfProcessorOpen={true}
+            />
+            <MovementControls 
+              selectedBox={selectedBox}
+              onCoordinateChange={(field, value) => {
+                if (pdfProcessorRef.current) {
+                  const pdfProcessor = pdfProcessorRef.current;
+                  const handleCoordinateChange = pdfProcessor.handleCoordinateChange;
+                  if (handleCoordinateChange) {
+                    handleCoordinateChange(field, value);
+                  }
                 }
-              }
-            }}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={(pageNumber) => {
-              if (pdfProcessorRef.current && pdfProcessorRef.current.handlePageChange) {
-                pdfProcessorRef.current.handlePageChange(pageNumber);
-              } else {
-                setCurrentPage(pageNumber);
-              }
-            }}
-            onBoxSelect={selectBoxById}
-            allBoxes={pdfBoxes}
-          />
+              }}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={(pageNumber) => {
+                if (pdfProcessorRef.current && pdfProcessorRef.current.handlePageChange) {
+                  pdfProcessorRef.current.handlePageChange(pageNumber);
+                } else {
+                  setCurrentPage(pageNumber);
+                }
+              }}
+              onBoxSelect={selectBoxById}
+              allBoxes={pdfBoxes}
+            />
+          </>
         ) : (
           <SideMenu
             buttons={sideMenuButtons}
             systemInstruction={systemInstruction}
             setSystemInstruction={setSystemInstruction}
             onLoadSavedPdf={handleLoadSavedPdf}
+            isPdfProcessorOpen={false}
           />
         )}
       </Sidebar>
@@ -184,6 +219,7 @@ const App: React.FC = () => {
               setPdfBoxes([]);
               setSelectedBox(null);
               setLoadedPdfData(undefined);
+              setVariableFields([]);
             }}
             onBoxesLoaded={handleBoxesLoaded}
             onPageChange={handlePageChange}
@@ -192,6 +228,8 @@ const App: React.FC = () => {
             externalControls={true}
             ref={pdfProcessorRef}
             loadedPdfData={loadedPdfData}
+            variableFields={variableFields}
+            onVariableFieldsChange={setVariableFields}
           />
         ) : (
           <ChatInterface systemInstruction={systemInstruction} />

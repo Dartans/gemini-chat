@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import useCookie from '../hooks/useCookie';
+import { VariableField } from '../types/pdfTypes';
+import VariableFieldsManager from './VariableFieldsManager';
+import './VariableFieldsManager.css';
+import './SideMenu.css';
 
 export interface SideMenuButton {
   label: string;
@@ -16,15 +20,37 @@ export interface SavedPdf {
 export interface SideMenuProps {
   buttons: SideMenuButton[];
   systemInstruction: string;
-  setSystemInstruction: React.Dispatch<React.SetStateAction<string>>;
+  setSystemInstruction: (value: string) => void;
   onLoadSavedPdf?: (pdfId: string) => void;
+  // Add variable fields manager props
+  variableFields?: VariableField[];
+  onVariableFieldsChange?: (fields: VariableField[]) => void;
+  onMapFields?: () => void;
+  isMappingInProgress?: boolean;
+  showVariableFields?: boolean;
+  isPdfProcessorOpen?: boolean; // Prop to indicate if PDF processor is open
 }
 
-const SideMenu: React.FC<SideMenuProps> = ({ buttons, systemInstruction, setSystemInstruction, onLoadSavedPdf }) => {
+const SideMenu: React.FC<SideMenuProps> = ({ 
+  buttons,
+  systemInstruction,
+  setSystemInstruction,
+  onLoadSavedPdf,
+  variableFields = [],
+  onVariableFieldsChange,
+  onMapFields,
+  isMappingInProgress = false,
+  showVariableFields = false,
+  isPdfProcessorOpen = false
+}) => {
   const [userName, setUserName] = useCookie('userName');
   const [savedPdfs] = useCookie('savedPdfs', '[]');
-  const [fullRequest, setFullRequest] = React.useState<string>('');
-  const [userNameInput, setUserNameInput] = React.useState(userName || '');
+  const [fullRequest, setFullRequest] = useState<string>('');
+  const [userNameInput, setUserNameInput] = useState(userName || '');
+  const [width, setWidth] = useState<number>(300);
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+  const sideMenuRef = useRef<HTMLDivElement>(null);
+  const resizerRef = useRef<HTMLDivElement>(null);
   
   const handleSaveUserName = () => {
     setUserName(userNameInput, { expires: 365 });
@@ -46,7 +72,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ buttons, systemInstruction, setSyst
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handler = (e: CustomEvent) => {
       setFullRequest(e.detail);
     };
@@ -54,42 +80,147 @@ const SideMenu: React.FC<SideMenuProps> = ({ buttons, systemInstruction, setSyst
     return () => window.removeEventListener('updateFullRequest', handler as EventListener);
   }, []);
 
+  // Mouse down event handler for resizer
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    e.preventDefault();
+  };
+
+  // Handle resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = e.clientX;
+      
+      // Set min and max constraints
+      if (newWidth >= 250 && newWidth <= 500) {
+        setWidth(newWidth);
+        
+        if (sideMenuRef.current) {
+          sideMenuRef.current.style.width = `${newWidth}px`;
+        }
+      }
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+    
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
+  // Parse the saved PDFs
+  const parsedSavedPdfs: SavedPdf[] = (() => {
+    try {
+      return JSON.parse(savedPdfs);
+    } catch (e) {
+      return [];
+    }
+  })();
+
   return (
-    <>
-      <div style={{ marginBottom: 16, overflowY: 'auto', overflowX: 'hidden', maxHeight: '100vh', boxSizing: 'border-box' }}>
-        <label htmlFor="sidebar-username" style={{ color: '#fff', fontSize: 14 }}>User Name:</label>
-        <input
-          id="sidebar-username"
-          type="text"
-          value={userNameInput}
-          onChange={e => setUserNameInput(e.target.value)}
-          placeholder="Enter your name"
-          style={{ width: '100%', marginTop: 4, marginBottom: 8, padding: 4, borderRadius: 4, border: '1px solid #ccc' }}
-        />
-        <button onClick={handleSaveUserName} style={{ width: '100%', padding: 4, borderRadius: 4, background: '#444', color: '#fff', border: 'none', cursor: 'pointer' }}>Save</button>
-        <div style={{ marginBottom: 16 }}>
-          <label htmlFor="systemInstruction" style={{ color: '#fff', fontSize: 14 }}>System Instruction:</label>
-          <textarea
-            id="systemInstruction"
-            value={systemInstruction}
-            onChange={e => setSystemInstruction(e.target.value)}
-            placeholder="Enter instructions for the AI (e.g., You are a helpful assistant)."
-            style={{ width: '100%', marginTop: 4, marginBottom: 8, padding: 4, borderRadius: 4, border: '1px solid #ccc', minHeight: 60 }}
-          />
+    <div 
+      className={`side-menu ${isPdfProcessorOpen ? 'pdf-processor-active' : ''}`} 
+      ref={sideMenuRef} 
+      style={{ width: `${width}px` }}
+    >
+      <div 
+        className={`side-menu-resizer ${isResizing ? 'resizing' : ''}`} 
+        ref={resizerRef}
+        onMouseDown={handleMouseDown}
+      />
+      <div className="side-menu-content">
+        {/* PDF Controls Section - Always shown */}
+        <div className="side-menu-section">
+          {buttons.map((btn, idx) => (
+            <button key={idx} onClick={btn.onClick} className="side-menu-button">
+              {btn.icon && <span className="button-icon">{btn.icon}</span>}
+              <span>{btn.label}</span>
+            </button>
+          ))}
         </div>
-        {buttons.map((btn, idx) => (
-          <button key={idx} onClick={btn.onClick} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {btn.icon}
-            {btn.label}
-          </button>
-        ))}
+        
+        {/* Variable Fields Manager - Always shown when showVariableFields is true */}
+        {showVariableFields && onVariableFieldsChange && onMapFields && (
+          <div className="side-menu-section side-menu-variable-fields">
+            <VariableFieldsManager
+              fields={variableFields}
+              onFieldsChange={onVariableFieldsChange}
+              onMapFields={onMapFields}
+              isMappingInProgress={isMappingInProgress}
+            />
+          </div>
+        )}
+        
+        {/* Only show these sections when PDF processor is not open */}
+        {!isPdfProcessorOpen && (
+          <>
+            {/* Saved PDFs section */}
+            {parsedSavedPdfs.length > 0 && (
+              <div className="saved-pdfs-section">
+                <h3 className="side-menu-label">Saved PDFs</h3>
+                {parsedSavedPdfs.map((pdf) => (
+                  <div 
+                    key={pdf.id} 
+                    className="saved-pdf-item"
+                    onClick={() => handleLoadPdf(pdf.id)}
+                  >
+                    <div>{pdf.fileName}</div>
+                    <div style={{ fontSize: '10px', opacity: 0.7 }}>{formatDate(pdf.timestamp)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* User info section */}
+            <div className="side-menu-section">
+              <label htmlFor="sidebar-username" className="side-menu-label">User Name:</label>
+              <input
+                id="sidebar-username"
+                type="text"
+                value={userNameInput}
+                onChange={e => setUserNameInput(e.target.value)}
+                placeholder="Enter your name"
+                className="side-menu-input"
+              />
+              <button 
+                onClick={handleSaveUserName} 
+                className="side-menu-button"
+              >
+                Save
+              </button>
+            </div>
+
+            {/* System instruction section */}
+            <div className="side-menu-section">
+              <label htmlFor="systemInstruction" className="side-menu-label">System Instruction:</label>
+              <textarea
+                id="systemInstruction"
+                value={systemInstruction}
+                onChange={e => setSystemInstruction(e.target.value)}
+                placeholder="Enter instructions for the AI (e.g., You are a helpful assistant)."
+                className="side-menu-textarea"
+              />
+            </div>
+            
+            {/* Full AI Request section in footer */}
+            <div className="side-menu-footer">
+              <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Full AI Request:</div>
+              <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{fullRequest}</pre>
+            </div>
+          </>
+        )}
       </div>
-      <div style={{ flex: 1 }} />
-      <div style={{ marginTop: 'auto', background: '#181818', color: '#fff', padding: 10, fontSize: 12, borderTop: '1px solid #333', wordBreak: 'break-all' }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Full AI Request:</div>
-        <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{fullRequest}</pre>
-      </div>
-    </>
+    </div>
   );
 };
 

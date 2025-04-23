@@ -1,19 +1,24 @@
 .pdf-processor {
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  max-width: 1000px; /* Increased to accommodate the sidebar */
-  margin: 20px auto;
+  position: relative; /* Change from absolute to relative positioning */
+  width: 100%;
+  height: 100%;
+  background-color: #ffffff;
+  z-index: 1; /* Lower z-index than sidebar */
+  display: flex;
+  flex-direction: column;
   padding: 20px;
+  box-sizing: border-box;
+  color: #333;
+  overflow-y: auto;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .pdf-processor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
+  margin-bottom: 10px;
 }
 
 .pdf-processor-header h2 {
@@ -24,28 +29,33 @@
   background: none;
   border: none;
   font-size: 24px;
+  color: #333;
   cursor: pointer;
-  color: #666;
+  padding: 5px 10px;
 }
 
 .close-button:hover {
-  color: #000;
+  color: #007bff;
 }
 
 .pdf-processor-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  flex: 1;
+  overflow: hidden;
 }
 
 .file-upload {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 10px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
   position: relative; /* Added for absolute positioning of success message */
 }
 
 .file-upload input[type="file"] {
+  max-width: 300px;
   padding: 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -86,10 +96,11 @@
   right: 0;
   top: 100%;
   margin-top: 10px;
-  padding: 8px 16px;
-  background-color: #e8f5e9;
+  padding: 10px;
+  background-color: rgba(76, 175, 80, 0.8);
+  border-radius: 3px;
+  margin-left: 10px;
   border: 1px solid #a5d6a7;
-  border-radius: 4px;
   color: #2e7d32;
   font-weight: 500;
   animation: fadeIn 0.3s ease-out;
@@ -104,9 +115,10 @@
 
 .error-message {
   padding: 10px;
-  background-color: #ffebee;
+  background-color: rgba(244, 67, 54, 0.8);
+  border-radius: 3px;
+  margin-bottom: 15px;
   border: 1px solid #ffcdd2;
-  border-radius: 4px;
   color: #c62828;
 }
 
@@ -114,8 +126,12 @@
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   padding: 15px;
-  background-color: #f5f5f5;
+  background-color: #f8f8f8;
   overflow-x: auto;
+  margin-top: 15px;
+  border-radius: 5px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .results pre {
@@ -124,6 +140,10 @@
 }
 
 .pdf-viewer-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   margin-top: 20px;
   margin-bottom: 20px;
   width: 100%;
@@ -132,6 +152,8 @@
 /* New wrapper for side-by-side view */
 .pdf-viewer-wrapper {
   display: flex;
+  flex: 1;
+  overflow: hidden;
   flex-direction: row;
   gap: 20px;
   width: 100%;
@@ -143,17 +165,26 @@
   align-items: center;
   flex: 1;
   min-width: 0; /* Allow flexbox to shrink below content width */
+  overflow: auto;
+  background-color: #f5f5f5;
+  border-radius: 5px;
+  padding: 10px;
+  position: relative;
 }
 
 .pdf-controls {
   display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
   align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 5px;
+  background-color: #e0e0e0;
+  border-radius: 3px;
 }
 
 .pdf-document-container {
   position: relative;
+  display: inline-block;
   margin: 0 auto;
 }
 
@@ -168,15 +199,23 @@
   pointer-events: auto; /* Allow mouse events to be captured by default */
 }
 
-/* Styling for the sidebar editor */
 .box-editor-sidebar {
-  flex: 0 0 250px; /* Fixed width sidebar */
+  width: 300px;
+  background-color: #222;
   padding: 15px;
+  overflow-y: auto;
+  margin-left: 15px;
+  border-radius: 5px;
+  flex: 0 0 250px; /* Fixed width sidebar */
   background-color: #f5f5f5;
   border-radius: 4px;
   border: 1px solid #e0e0e0;
   max-height: 500px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex: 0 0 300px;
 }
 
 .box-editor-sidebar h3 {
@@ -192,19 +231,28 @@
 }
 
 .coordinate-inputs {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 15px;
   flex-direction: column;
-  gap: 8px;
 }
 
 .coordinate-inputs label {
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
   align-items: center;
   font-weight: bold;
 }
 
 .coordinate-inputs input {
+  width: 100%;
+  margin-top: 5px;
+  background-color: #333;
+  border: 1px solid #555;
+  color: white;
+  padding: 5px;
   width: 70px;
   padding: 5px;
   border: 1px solid #ddd;
@@ -213,6 +261,12 @@
 }
 
 .selected-text {
+  font-style: italic;
+  margin-bottom: 15px;
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  border-radius: 3px;
+  word-break: break-word;
   padding: 8px;
   background-color: #e3f2fd;
   border-left: 3px solid #2196f3;
@@ -222,6 +276,10 @@
 }
 
 .editing-help {
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  border-radius: 3px;
+  margin-top: 15px;
   background-color: #fff3e0;
   padding: 8px 12px;
   border-radius: 4px;
@@ -235,11 +293,15 @@
 }
 
 .help-text ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
   margin: 5px 0 0 0;
   padding-left: 20px;
 }
 
 .help-text li {
+  margin-bottom: 5px;
+  font-size: 12px;
   margin-bottom: 3px;
 }
 
@@ -252,19 +314,85 @@
 
 /* Styling for selected box in results list */
 .selected-box-result {
+  background-color: rgba(0, 128, 255, 0.2) !important;
+  border-left: 3px solid #0080ff;
   background-color: #e3f2fd;
   font-weight: bold;
   cursor: pointer;
 }
 
+.page-results {
+  margin-bottom: 20px;
+}
+
+.page-results h4 {
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.page-results ul {
+  list-style: none;
+  padding: 0;
+}
+
 .page-results li {
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 3px;
+  background-color: #f5f5f5;
   cursor: pointer;
+  transition: background-color 0.2s;
   padding: 3px;
   border-radius: 2px;
 }
 
 .page-results li:hover {
+  background-color: rgba(255, 255, 255, 0.1);
   background-color: #f0f0f0;
+}
+
+.save-button, 
+.load-button,
+.toggle-view-button {
+  background-color: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.save-button:hover, 
+.load-button:hover,
+.toggle-view-button:hover {
+  background-color: #1557b0;
+}
+
+.toggle-view-button {
+  background-color: #673ab7;
+}
+
+.toggle-view-button:hover {
+  background-color: #5e35b1;
+}
+
+/* New styles for the variable mapping features */
+.mapped-field {
+  background-color: rgba(0, 150, 0, 0.2);
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+  color: #2e7d32;
+  font-size: 0.9em;
+}
+
+.box-coordinates {
+  font-size: 0.8em;
+  color: #666;
+  margin-left: 8px;
 }
 
 /* Responsive design */
@@ -277,4 +405,55 @@
     flex: none;
     width: 100%;
   }
+}
+
+/* Import VariableFieldsManager styles */
+@import url('./VariableFieldsManager.css');
+
+.sidebar-and-viewer-container {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  width: 100%;
+  flex: 1;
+  overflow: hidden;
+}
+
+.main-viewer-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.no-pdf-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  background-color: #f8f8f8;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+  color: #666;
+  font-style: italic;
+}
+
+.box-editor-section {
+  margin-top: 20px;
+}
+
+.save-filled-pdf-button {
+  background-color: #4caf50; /* Green color for the save filled PDF button */
+  color: white;
+  border: none;
+  border-radius: 3px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: 5px;
+}
+
+.save-filled-pdf-button:hover {
+  background-color: #388e3c; /* Darker green on hover */
 }
