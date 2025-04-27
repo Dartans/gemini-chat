@@ -1,0 +1,162 @@
+.side-menu {
+  background-color: #222;
+  color: white;
+  height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 250px;
+  max-width: 500px;
+  width: 300px;
+  border-right: 1px solid #444;
+  overflow: hidden;
+  transition: width 0.2s ease;
+}
+
+.side-menu-content {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto; /* Single scrollbar for the entire content */
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-menu-footer {
+  margin-top: auto;
+  background: #181818;
+  color: #fff;
+  padding: 10px;
+  font-size: 12px;
+  border-top: 1px solid #333;
+  word-break: break-all;
+  max-height: 30vh;
+  overflow: hidden; /* Remove separate scrollbar from footer */
+}
+
+/* Remove max-height to prevent footer scrolling independently */
+.side-menu-footer pre {
+  white-space: pre-wrap;
+  margin: 0;
+  overflow: visible;
+}
+
+.side-menu-input {
+  width: 100%;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background-color: #333;
+  color: white;
+}
+
+.side-menu-button {
+  width: 100%;
+  padding: 8px 12px;
+  margin: 6px 0;
+  border-radius: 4px;
+  background: #444;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.side-menu-button:hover {
+  background: #555;
+}
+
+.side-menu-button:active {
+  background: #666;
+}
+
+.side-menu-section {
+  margin-bottom: 16px;
+  min-height: auto; /* Allow sections to shrink appropriately */
+}
+
+.side-menu-label {
+  color: #fff;
+  font-size: 14px;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.side-menu-textarea {
+  width: 100%;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background-color: #333;
+  color: white;
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Resizer styles */
+.side-menu-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 6px;
+  background: transparent;
+  cursor: ew-resize;
+  z-index: 10;
+}
+
+.side-menu-resizer:hover,
+.side-menu-resizer.resizing {
+  background: rgba(100, 100, 255, 0.3);
+}
+
+/* Fix for Safari */
+.side-menu * {
+  box-sizing: border-box;
+}
+
+.saved-pdfs-section {
+  margin-top: 16px;
+  border-top: 1px solid #444;
+  padding-top: 16px;
+}
+
+.saved-pdf-item {
+  padding: 8px;
+  margin: 4px 0;
+  border-radius: 4px;
+  background-color: #333;
+  cursor: pointer;
+}
+
+.saved-pdf-item:hover {
+  background-color: #444;
+}
+
+.side-menu-variable-fields {
+  margin-bottom: 0;
+  flex-shrink: 0; /* Prevent this section from shrinking more than others */
+  min-height: 200px; /* Minimum height to ensure visibility */
+}
+
+/* Remove all internal scrolling for components */
+.side-menu-variable-fields > div {
+  height: auto;
+  overflow-y: visible;
+}
+
+/* PDF processor specific styles */
+.pdf-processor-active .side-menu-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}

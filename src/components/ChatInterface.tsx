@@ -11,12 +11,17 @@ interface ChatConfig {
   systemInstruction: string;
 }
 
-const ChatInterface: React.FC = () => {
+interface ChatInterfaceProps {
+  systemInstruction: string;
+}
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ systemInstruction }) => {
   const [apiKey] = useCookie('geminiApiKey');
+  const [userName] = useCookie('userName');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const [systemInstruction, setSystemInstruction] = useState<string>('');
+  const [currentInput, setCurrentInput] = useState('');
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -24,9 +29,18 @@ const ChatInterface: React.FC = () => {
     }
   }, [messages]);
 
-  const handleSystemInstructionChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setSystemInstruction(event.target.value);
-  };
+  // Update full AI request preview on input or system instruction change
+  useEffect(() => {
+    let fullSystemInstruction = systemInstruction;
+    if (userName) {
+      fullSystemInstruction = `'''the users name is ${userName}''' ` + (systemInstruction || '');
+    }
+    window.dispatchEvent(new CustomEvent('updateFullRequest', { detail: JSON.stringify({
+      systemInstruction: fullSystemInstruction,
+      userMessage: currentInput,
+      userName: userName || undefined
+    }, null, 2) }));
+  }, [systemInstruction, userName, currentInput]);
 
   const handleSendMessage = async (newMessage: string) => {
     if (!apiKey) {
@@ -44,8 +58,18 @@ const ChatInterface: React.FC = () => {
     setLoading(true);
 
     try {
+      let fullSystemInstruction = systemInstruction;
+      if (userName) {
+        fullSystemInstruction = `'''the users name is ${userName}''' ` + (systemInstruction || '');
+      }
+      // Dispatch event to update sidebar
+      window.dispatchEvent(new CustomEvent('updateFullRequest', { detail: JSON.stringify({
+        systemInstruction: fullSystemInstruction,
+        userMessage: newMessage,
+        userName: userName || undefined
+      }, null, 2) }));
       const systemInput: ChatConfig = {
-        systemInstruction: systemInstruction,
+        systemInstruction: fullSystemInstruction,
       };
       const aiResponse = await chatWithGemini(apiKey, newMessage, systemInput); // Pass config
 
@@ -65,27 +89,19 @@ const ChatInterface: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, { text: "Sorry, an error occurred.", isUser: false, timestamp: new Date() }]);
     } finally {
       setLoading(false);
+      setCurrentInput(''); // Clear preview after send
     }
   };
 
   return (
     <div className="chat-interface">
-      <div className="system-instruction-container">
-        <label htmlFor="systemInstruction">System Instruction:</label>
-        <textarea
-          id="systemInstruction"
-          value={systemInstruction}
-          onChange={handleSystemInstructionChange}
-          placeholder="Enter instructions for the AI (e.g., You are a helpful assistant)."
-        />
-      </div>
       <div className="chat-container" ref={chatContainerRef}>
         {messages.map((message: Message, index: number) => (
           <MessageItem key={index} message={message} />
         ))}
         {loading && <LoadingIndicator />}
       </div>
-      <MessageInput onSendMessage={handleSendMessage} />
+      <MessageInput onSendMessage={handleSendMessage} onInputChange={setCurrentInput} />
     </div>
   );
 };

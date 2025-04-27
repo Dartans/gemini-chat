@@ -18,6 +18,7 @@ const ApiKeyInput: React.FC<ApiKeyInputProps> = ({ onApiKeySubmit }) => {
   return (
     <div>
       <h2>Enter your Gemini API Key</h2>
+      <h2>https://aistudio.google.com/app/apikey</h2>
       <form onSubmit={handleSubmit}>
         <div>
           <label htmlFor="apiKey">API Key:</label>

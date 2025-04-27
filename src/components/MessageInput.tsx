@@ -2,19 +2,22 @@ import React, { useState } from 'react';
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
+  onInputChange?: (message: string) => void;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage }) => {
+const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, onInputChange }) => {
   const [newMessage, setNewMessage] = useState('');
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setNewMessage(event.target.value);
+    if (onInputChange) onInputChange(event.target.value);
   };
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
       onSendMessage(newMessage);
       setNewMessage('');
+      if (onInputChange) onInputChange('');
     }
   };
 
