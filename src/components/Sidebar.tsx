@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import useCookie from '../hooks/useCookie';
+import SideMenu, { SideMenuButton } from './SideMenu';
 import './Sidebar.css';
 
 // Define the type for navigation items
 interface NavigationItem {
   id: string;
+  key?: string;
   label: string;
   icon?: React.ReactNode;
   onClick: () => void;
@@ -23,6 +25,8 @@ interface SidebarProps {
   navigationItems: NavigationItem[];
   activeTool: string | null;
   onLoadSavedPdf?: (pdfId: string) => void;
+  onSaveState?: () => void;     // Add prop for saving state
+  onRestoreState?: () => void;  // Add prop for restoring state
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -30,35 +34,20 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggle, 
   navigationItems,
   activeTool,
-  onLoadSavedPdf 
+  onLoadSavedPdf,
+  onSaveState,
+  onRestoreState
 }) => {
   const [savedPdfs] = useCookie('savedPdfs', '[]');
+  const [systemInstruction, setSystemInstruction] = useState<string>('');
 
-  // Format date for display
-  const formatDate = (dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-    } catch (e) {
-      return 'Unknown date';
-    }
-  };
-
-  // Handle loading a saved PDF
-  const handleLoadPdf = (pdfId: string) => {
-    if (onLoadSavedPdf) {
-      onLoadSavedPdf(pdfId);
-    }
-  };
-
-  // Parse the saved PDFs
-  const parsedSavedPdfs: SavedPdf[] = (() => {
-    try {
-      return JSON.parse(savedPdfs);
-    } catch (e) {
-      return [];
-    }
-  })();
+  // Convert navigation items to SideMenuButtons
+  const sideMenuButtons: SideMenuButton[] = navigationItems.map(item => ({
+    label: item.label,
+    onClick: item.onClick,
+    icon: item.icon,
+    key: item.key || item.id
+  }));
 
   return (
     <div className={`sidebar${collapsed ? ' collapsed' : ''}`}>  
@@ -72,36 +61,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             <h2>PDF Tools</h2>
           </div>
           
-          <div className="sidebar-navigation">
-            {navigationItems.map((item) => (
-              <div 
-                key={item.id}
-                className={`nav-item ${activeTool === item.id ? 'active' : ''}`}
-                onClick={item.onClick}
-              >
-                {item.icon && <span className="nav-icon">{item.icon}</span>}
-                <span className="nav-label">{item.label}</span>
-              </div>
-            ))}
-          </div>
-          
-          {parsedSavedPdfs.length > 0 && (
-            <div className="saved-pdfs-section">
-              <h3>Saved PDFs</h3>
-              <div className="saved-pdfs-list">
-                {parsedSavedPdfs.map((pdf) => (
-                  <div 
-                    key={pdf.id} 
-                    className="saved-pdf-item"
-                    onClick={() => handleLoadPdf(pdf.id)}
-                  >
-                    <div className="pdf-name">{pdf.fileName}</div>
-                    <div className="pdf-date">{formatDate(pdf.timestamp)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Replace with SideMenu component */}
+          <SideMenu
+            buttons={sideMenuButtons}
+            systemInstruction={systemInstruction}
+            setSystemInstruction={setSystemInstruction}
+            onLoadSavedPdf={onLoadSavedPdf}
+            isPdfProcessorOpen={activeTool === 'pdfProcessor'}
+            onSaveState={onSaveState}         // Pass save state handler
+            onRestoreState={onRestoreState}   // Pass restore state handler
+          />
         </div>
       )}
     </div>

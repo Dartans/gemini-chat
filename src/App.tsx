@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import ApiKeyInput from './components/ApiKeyInput';
 import PdfProcessor, { PdfProcessorRef } from './components/PdfProcessor';
 import VariableFieldsManager from './components/VariableFieldsManager';
@@ -103,6 +103,26 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Save state when navigating away from a tool
+  const saveCurrentState = useCallback(() => {
+    if (activeTool === 'pdfProcessor') {
+      if (pdfProcessorRef.current?.saveCurrentState) {
+        pdfProcessorRef.current.saveCurrentState();
+      }
+    }
+    // Add other tool state saving logic here as needed
+  }, [activeTool]);
+
+  // Restore state when navigating to a tool
+  const restoreState = useCallback(() => {
+    if (activeTool === 'pdfProcessor') {
+      if (pdfProcessorRef.current?.restoreState) {
+        pdfProcessorRef.current.restoreState();
+      }
+    }
+    // Add other tool state restoration logic here as needed
+  }, [activeTool]);
+
   // Handler for loading a saved PDF from the side menu
   const handleLoadSavedPdf = useCallback((pdfId: string) => {
     try {
@@ -147,19 +167,38 @@ const App: React.FC = () => {
     }
   }, [pdfBoundingBoxes]);
 
+  // Handle tool change with state saving/restoring
+  const handleToolChange = useCallback((tool: Tool | null) => {
+    // If we're navigating away from a tool, save its state
+    if (activeTool) {
+      saveCurrentState();
+    }
+    
+    // Update the active tool
+    setActiveTool(tool);
+    
+    // After changing tool, restore state if applicable
+    // We use setTimeout to ensure the tool component has mounted
+    if (tool) {
+      setTimeout(() => restoreState(), 100);
+    }
+  }, [activeTool, saveCurrentState, restoreState]);
+
   // Navigation items for the sidebar
   const navigationItems = [
     {
       id: 'pdfProcessor',
+      key: 'pdfProcessor',  // Add key for identifying the button
       label: "PDF Processor",
       icon: "📄",
-      onClick: () => setActiveTool('pdfProcessor')
+      onClick: () => handleToolChange('pdfProcessor')
     },
     {
       id: 'variableEditor',
+      key: 'variableEditor',  // Add key for identifying the button
       label: "Variable Editor",
       icon: "✏️",
-      onClick: () => setActiveTool('variableEditor')
+      onClick: () => handleToolChange('variableEditor')
     }
   ];
 
@@ -199,7 +238,9 @@ const App: React.FC = () => {
           <div className="tool-container">
             <PdfProcessor 
               onClose={() => {
-                setActiveTool(null);
+                // Save state before closing
+                saveCurrentState();
+                handleToolChange(null);
                 setPdfBoxes([]);
                 setSelectedBox(null);
                 setLoadedPdfData(undefined);
@@ -356,7 +397,7 @@ const App: React.FC = () => {
               {variableFields.length > 0 && (
                 <div className="variable-actions">
                   <button
-                    onClick={() => setActiveTool('pdfProcessor')}
+                    onClick={() => handleToolChange('pdfProcessor')}
                     className="apply-to-pdf-button"
                   >
                     Apply to PDF
@@ -380,6 +421,8 @@ const App: React.FC = () => {
         navigationItems={navigationItems}
         activeTool={activeTool}
         onLoadSavedPdf={handleLoadSavedPdf}
+        onSaveState={saveCurrentState}
+        onRestoreState={restoreState}
       />
       <div className="main-content">
         {renderMainContent()}

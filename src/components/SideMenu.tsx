@@ -9,6 +9,7 @@ export interface SideMenuButton {
   label: string;
   onClick: () => void;
   icon?: React.ReactNode;
+  key?: string; // Add a key property for identifying buttons
 }
 
 export interface SavedPdf {
@@ -29,6 +30,8 @@ export interface SideMenuProps {
   isMappingInProgress?: boolean;
   showVariableFields?: boolean;
   isPdfProcessorOpen?: boolean; // Prop to indicate if PDF processor is open
+  onSaveState?: () => void;     // Callback for saving state
+  onRestoreState?: () => void;  // Callback for restoring state
 }
 
 const SideMenu: React.FC<SideMenuProps> = ({ 
@@ -41,7 +44,9 @@ const SideMenu: React.FC<SideMenuProps> = ({
   onMapFields,
   isMappingInProgress = false,
   showVariableFields = false,
-  isPdfProcessorOpen = false
+  isPdfProcessorOpen = false,
+  onSaveState,
+  onRestoreState
 }) => {
   const [userName, setUserName] = useCookie('userName');
   const [savedPdfs] = useCookie('savedPdfs', '[]');
@@ -49,6 +54,7 @@ const SideMenu: React.FC<SideMenuProps> = ({
   const [userNameInput, setUserNameInput] = useState(userName || '');
   const [width, setWidth] = useState<number>(300);
   const [isResizing, setIsResizing] = useState<boolean>(false);
+  const [activeButton, setActiveButton] = useState<string | null>(null); // Track active button
   const sideMenuRef = useRef<HTMLDivElement>(null);
   const resizerRef = useRef<HTMLDivElement>(null);
   
@@ -118,6 +124,26 @@ const SideMenu: React.FC<SideMenuProps> = ({
     };
   }, [isResizing]);
 
+  // Handle button click with state saving/restoring
+  const handleButtonClick = (button: SideMenuButton) => {
+    if (onSaveState && activeButton) {
+      // Save current state before switching
+      onSaveState();
+    }
+    
+    // Set new active button
+    setActiveButton(button.key || null);
+    
+    // Restore state for the new tool if needed
+    if (onRestoreState && button.key) {
+      // We'll restore after the button's onClick has executed
+      setTimeout(() => onRestoreState(), 100);
+    }
+    
+    // Execute the button's original onClick handler
+    button.onClick();
+  };
+
   // Parse the saved PDFs
   const parsedSavedPdfs: SavedPdf[] = (() => {
     try {
@@ -142,7 +168,11 @@ const SideMenu: React.FC<SideMenuProps> = ({
         {/* PDF Controls Section - Always shown */}
         <div className="side-menu-section">
           {buttons.map((btn, idx) => (
-            <button key={idx} onClick={btn.onClick} className="side-menu-button">
+            <button 
+              key={idx} 
+              onClick={() => handleButtonClick(btn)} 
+              className={`side-menu-button ${activeButton === btn.key ? 'active' : ''}`}
+            >
               {btn.icon && <span className="button-icon">{btn.icon}</span>}
               <span>{btn.label}</span>
             </button>

@@ -46,3 +46,50 @@ export const loadPdfFromBase64 = (base64Data: string, fileName: string): File =>
   // Create a File object from the blob
   return new File([blob], fileName, { type: 'application/pdf' });
 };
+
+/**
+ * Convert a File object to a Base64 string
+ * @param file The file to convert
+ * @returns Promise resolving to a Base64 string
+ */
+export const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        // Remove data URL prefix (e.g., "data:application/pdf;base64,")
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      } else {
+        reject(new Error('Failed to convert file to Base64'));
+      }
+    };
+    reader.onerror = error => reject(error);
+  });
+};
+
+/**
+ * Convert a Base64 string to a Blob object
+ * @param base64 The Base64 string to convert
+ * @param type The MIME type of the file
+ * @returns A Blob object
+ */
+export const base64ToBlob = (base64: string, type: string): Blob => {
+  const byteCharacters = atob(base64);
+  const byteArrays = [];
+
+  for (let offset = 0; offset < byteCharacters.length; offset += 1024) {
+    const slice = byteCharacters.slice(offset, offset + 1024);
+    const byteNumbers = new Array(slice.length);
+    
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+
+  return new Blob(byteArrays, { type });
+};

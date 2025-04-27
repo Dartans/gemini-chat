@@ -62,6 +62,8 @@ export interface PdfProcessorRef {
   saveBoundingBoxData: () => Promise<void>;
   loadBoundingBoxData: () => Promise<void>;
   toggleVariableView: () => void;
+  saveCurrentState: () => void; // Add the saveCurrentState function to the ref interface
+  restoreState: () => void; // Add the restoreState function to the ref interface
 }
 
 const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref) => {
@@ -647,7 +649,9 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     processFile,
     saveBoundingBoxData,
     loadBoundingBoxData,
-    toggleVariableView
+    toggleVariableView,
+    saveCurrentState, // Expose the saveCurrentState function
+    restoreState // Expose the restoreState function
   }));
 
   // Function to save bounding box data to a local JSON file
@@ -756,6 +760,91 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     }[];
   }
 
+  // Define interface for the state to be saved between tool navigations
+  interface PdfProcessorSavedState {
+    fileName: string | null; // filename for reference
+    fileType: string | null; // store the mime type
+    fileData: string | null; // store file as base64 string
+    pdfUrl: string | null;
+    rawPdfData: string | null;
+    parsedResults: PdfResults | null;
+    currentPage: number;
+    scale: number;
+    variableFields: VariableField[];
+    variableMappings: VariableMapping[];
+    unmappedBoxIds: string[];
+    showVariables: boolean;
+  }
+
+  // Save the current state to localStorage
+  const saveCurrentState = async () => {
+    if (!file) return;
+    
+    try {
+      const savedState: PdfProcessorSavedState = {
+        fileName: file.name,
+        fileType: file.type,
+        fileData: await fileToBase64(file),
+        pdfUrl,
+        rawPdfData,
+        parsedResults,
+        currentPage,
+        scale,
+        variableFields: variableFields || [],
+        variableMappings,
+        unmappedBoxIds,
+        showVariables
+      };
+      
+      localStorage.setItem('pdf-processor-state', JSON.stringify(savedState));
+    } catch (err) {
+      console.error("Failed to save PDF processor state:", err);
+    }
+  };
+
+  // Restore state from localStorage
+  const restoreState = useCallback(() => {
+    try {
+      const savedStateString = localStorage.getItem('pdf-processor-state');
+      if (!savedStateString) return;
+      
+      const savedState: PdfProcessorSavedState = JSON.parse(savedStateString);
+      
+      // Recreate the file object from the saved data
+      if (savedState.fileData && savedState.fileName && savedState.fileType) {
+        const blob = base64ToBlob(savedState.fileData, savedState.fileType);
+        const newFile = new File([blob], savedState.fileName, { type: savedState.fileType });
+        setFile(newFile);
+      }
+      
+      if (savedState.pdfUrl) setPdfUrl(savedState.pdfUrl);
+      if (savedState.rawPdfData) setRawPdfData(savedState.rawPdfData);
+      if (savedState.parsedResults) setParsedResults(savedState.parsedResults);
+      if (savedState.currentPage) setCurrentPage(savedState.currentPage);
+      if (savedState.scale) setScale(savedState.scale);
+      
+      // Restore variable information
+      if (savedState.variableFields && !propVariableFields) {
+        setLocalVariableFields(savedState.variableFields);
+      }
+      
+      if (savedState.variableMappings) setVariableMappings(savedState.variableMappings);
+      if (savedState.unmappedBoxIds) setUnmappedBoxIds(savedState.unmappedBoxIds);
+      if (savedState.showVariables !== undefined) setShowVariables(savedState.showVariables);
+      
+      // Notify parent component about loaded boxes if callback provided
+      if (onBoxesLoaded && externalControls && savedState.parsedResults) {
+        const allBoxes = savedState.parsedResults.pages.flatMap(page => page.boxes);
+        onBoxesLoaded(allBoxes, null);
+      }
+      
+      return savedState;
+    } catch (err) {
+      console.error("Failed to restore PDF processor state:", err);
+      return null;
+    }
+  }, [onBoxesLoaded, externalControls, propVariableFields]);
+
   // Function to print filled PDF with variable values - updated to use service function
   const printPdf = async () => {
     if (!file || !pdfUrl || !variableFields || variableFields.length === 0 || !parsedResults) {
@@ -792,6 +881,14 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       setIsProcessing(false);
     }
   };
+
+  // Effect to restore state from localStorage when component mounts
+  useEffect(() => {
+    // Only attempt to restore state if we don't have a PDF loaded already and we're not using loadedPdfData
+    if (!file && !props.loadedPdfData) {
+      restoreState();
+    }
+  }, [restoreState, file, props.loadedPdfData]);
 
   // When component mounts or updates with external controls prop change
   useEffect(() => {
