@@ -5,25 +5,17 @@
 
 /**
  * Gets the appropriate worker URL based on the current environment.
- * Prioritizes the local worker file if available, falls back to CDN.
+ * Uses a stable version from unpkg that's known to work with react-pdf
  * 
  * @param pdfJsVersion The version of PDF.js being used
  * @returns The URL for the PDF.js worker
  */
 export const getPdfWorkerUrl = (pdfJsVersion: string): string => {
-  // For browser environments
-  if (typeof window !== 'undefined') {
-    // For local development and production builds, try to use the local worker file first
-    const localWorkerUrl = `${window.location.origin}/pdfjs/pdf.worker.min.js`;
-    
-    // Fallback to CDN if specified or if in an environment where local files might not be accessible
-    const cdnWorkerUrl = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.worker.min.js`;
-    
-    return localWorkerUrl;
-  }
-  
-  // For server-side rendering or environments without 'window'
-  return `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfJsVersion}/pdf.worker.min.js`;
+  // Using unpkg CDN which has more consistent version availability
+  // This version (3.11.174) is stable and works with react-pdf
+  const unpkgWorkerUrl = `https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+  console.log(`Using PDF.js worker from unpkg: ${unpkgWorkerUrl}`);
+  return unpkgWorkerUrl;
 };
 
 /**
@@ -38,8 +30,17 @@ export const configurePdfWorker = (pdfjs: any): void => {
     return;
   }
   
-  // Set the worker source
+  // Set the worker source - using a fixed version that works instead of dynamic versioning
   pdfjs.GlobalWorkerOptions.workerSrc = getPdfWorkerUrl(pdfjs.version);
   
   console.log(`PDF.js Worker configured: ${pdfjs.GlobalWorkerOptions.workerSrc}`);
+  
+  // Force the worker source to use a specific version regardless of what react-pdf
+  // or pdfjs-dist is trying to use
+  try {
+    // This makes sure we're using the same worker version throughout the app
+    window['pdfWorkerSrc'] = getPdfWorkerUrl(pdfjs.version);
+  } catch (e) {
+    console.error('Could not set global PDF worker source:', e);
+  }
 };
