@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { UserResource } from '@clerk/types';
+import { SignOutButton } from '@clerk/clerk-react';
 import useCookie from '../hooks/useCookie';
 import { VariableField } from '../types/pdfTypes';
 import VariableFieldsManager from './VariableFieldsManager';
@@ -20,8 +22,6 @@ export interface SavedPdf {
 
 export interface SideMenuProps {
   buttons: SideMenuButton[];
-  systemInstruction: string;
-  setSystemInstruction: (value: string) => void;
   onLoadSavedPdf?: (pdfId: string) => void;
   // Add variable fields manager props
   variableFields?: VariableField[];
@@ -32,12 +32,11 @@ export interface SideMenuProps {
   isPdfProcessorOpen?: boolean; // Prop to indicate if PDF processor is open
   onSaveState?: () => void;     // Callback for saving state
   onRestoreState?: () => void;  // Callback for restoring state
+  user?: UserResource | null;   // Add user prop from Clerk
 }
 
 const SideMenu: React.FC<SideMenuProps> = ({ 
   buttons,
-  systemInstruction,
-  setSystemInstruction,
   onLoadSavedPdf,
   variableFields = [],
   onVariableFieldsChange,
@@ -46,11 +45,11 @@ const SideMenu: React.FC<SideMenuProps> = ({
   showVariableFields = false,
   isPdfProcessorOpen = false,
   onSaveState,
-  onRestoreState
+  onRestoreState,
+  user
 }) => {
   const [userName, setUserName] = useCookie('userName');
   const [savedPdfs] = useCookie('savedPdfs', '[]');
-  const [fullRequest, setFullRequest] = useState<string>('');
   const [userNameInput, setUserNameInput] = useState(userName || '');
   const [width, setWidth] = useState<number>(300);
   const [isResizing, setIsResizing] = useState<boolean>(false);
@@ -77,14 +76,6 @@ const SideMenu: React.FC<SideMenuProps> = ({
       onLoadSavedPdf(pdfId);
     }
   };
-
-  useEffect(() => {
-    const handler = (e: CustomEvent) => {
-      setFullRequest(e.detail);
-    };
-    window.addEventListener('updateFullRequest', handler as EventListener);
-    return () => window.removeEventListener('updateFullRequest', handler as EventListener);
-  }, []);
 
   // Mouse down event handler for resizer
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -165,6 +156,18 @@ const SideMenu: React.FC<SideMenuProps> = ({
         onMouseDown={handleMouseDown}
       />
       <div className="side-menu-content">
+        {/* User Profile Section */}
+        {user && (
+          <div className="side-menu-section user-profile-section">
+            <div className="user-info">
+              <div className="user-email">{user.emailAddresses[0]?.emailAddress}</div>
+              <SignOutButton>
+                <button className="sign-out-button">Sign Out</button>
+              </SignOutButton>
+            </div>
+          </div>
+        )}
+        
         {/* PDF Controls Section - Always shown */}
         <div className="side-menu-section">
           {buttons.map((btn, idx) => (
@@ -211,42 +214,26 @@ const SideMenu: React.FC<SideMenuProps> = ({
               </div>
             )}
 
-            {/* User info section */}
-            <div className="side-menu-section">
-              <label htmlFor="sidebar-username" className="side-menu-label">User Name:</label>
-              <input
-                id="sidebar-username"
-                type="text"
-                value={userNameInput}
-                onChange={e => setUserNameInput(e.target.value)}
-                placeholder="Enter your name"
-                className="side-menu-input"
-              />
-              <button 
-                onClick={handleSaveUserName} 
-                className="side-menu-button"
-              >
-                Save
-              </button>
-            </div>
-
-            {/* System instruction section */}
-            <div className="side-menu-section">
-              <label htmlFor="systemInstruction" className="side-menu-label">System Instruction:</label>
-              <textarea
-                id="systemInstruction"
-                value={systemInstruction}
-                onChange={e => setSystemInstruction(e.target.value)}
-                placeholder="Enter instructions for the AI (e.g., You are a helpful assistant)."
-                className="side-menu-textarea"
-              />
-            </div>
-            
-            {/* Full AI Request section in footer */}
-            <div className="side-menu-footer">
-              <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Full AI Request:</div>
-              <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{fullRequest}</pre>
-            </div>
+            {/* User info section - Only show if not authenticated with Clerk */}
+            {!user && (
+              <div className="side-menu-section">
+                <label htmlFor="sidebar-username" className="side-menu-label">User Name:</label>
+                <input
+                  id="sidebar-username"
+                  type="text"
+                  value={userNameInput}
+                  onChange={e => setUserNameInput(e.target.value)}
+                  placeholder="Enter your name"
+                  className="side-menu-input"
+                />
+                <button 
+                  onClick={handleSaveUserName} 
+                  className="side-menu-button"
+                >
+                  Save
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

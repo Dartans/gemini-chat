@@ -1,6 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Document, Page } from 'react-pdf';
-import { pdfjs } from 'react-pdf';
+import { Document, Page, pdfjs } from 'react-pdf';
 import useCookie from '../hooks/useCookie';
 import { 
   mapVariablesToBoxes, 
@@ -15,16 +14,13 @@ import {
 } from '../services/pdfFileService';
 import { BoundingBox, PdfResults, VariableField, VariableMapping, FieldMappingResult } from '../types/pdfTypes';
 import './PdfProcessor.css';
-// Remove unused import
 import './VariableFieldsManager.css';
-// Import only the used utility function
 import { normalizeCoordinates } from '../utils/pdfCoordinateUtils';
+import { fileToBase64, base64ToBlob } from '../utils/pdfUtils';
+import { configurePdfWorker } from '../../utils/pdfJsWorkerUtils';
 
-// Configure pdf.js worker using import.meta.url for better module resolution
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();
+// Configure PDF.js worker using our utility
+configurePdfWorker(pdfjs);
 
 interface PdfProcessorProps {
   onClose: () => void;
@@ -42,6 +38,11 @@ interface PdfProcessorProps {
   // Add variable fields props
   variableFields?: VariableField[];
   onVariableFieldsChange?: (fields: VariableField[]) => void;
+  // Add props for external state management
+  scale?: number;
+  onScaleChange?: (scale: number) => void;
+  currentPage?: number;
+  selectedBox?: BoundingBox | null;
 }
 
 // Export a ref interface
@@ -76,11 +77,15 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     externalControls = false,
     // Access variable fields props
     variableFields: propVariableFields,
-    onVariableFieldsChange
+    onVariableFieldsChange,
+    // Access external control props
+    scale: propScale,
+    onScaleChange: propOnScaleChange,
+    currentPage: propCurrentPage,
+    selectedBox: propSelectedBox
   } = props;
   
   const [apiKey] = useCookie('geminiApiKey');
-  // Remove unused cookie state variables
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [rawPdfData, setRawPdfData] = useState<string | null>(null);
@@ -89,36 +94,68 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
   const [parsedResults, setParsedResults] = useState<PdfResults | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.0);
+  
+  // Internal state variables (used when externalControls is false)
+  const [internalCurrentPage, setInternalCurrentPage] = useState<number>(1);
+  const [internalScale, setInternalScale] = useState<number>(1.0);
+  const [internalSelectedBox, setInternalSelectedBox] = useState<BoundingBox | null>(null);
+  const [localVariableFields, setLocalVariableFields] = useState<VariableField[]>([]);
+  
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   
   // Box selection and movement states
-  const [selectedBox, setSelectedBox] = useState<BoundingBox | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
 
-  // Variable fields and mapping states - use local state only if props not provided
-  const [localVariableFields, setLocalVariableFields] = useState<VariableField[]>([]);
+  // Variable fields and mapping states
   const [variableMappings, setVariableMappings] = useState<VariableMapping[]>([]);
   const [unmappedBoxIds, setUnmappedBoxIds] = useState<string[]>([]);
-  // Keep this variable but mark it as intended to be unused with underscore prefix
   const [_isMappingInProgress, setIsMappingInProgress] = useState(false);
   const [showVariables, setShowVariables] = useState(true);
 
-  // Use props variable fields if provided, otherwise use local state
+  // Determine the effective state values based on externalControls
+  const currentPage = externalControls ? (propCurrentPage ?? 1) : internalCurrentPage;
+  const scale = externalControls ? (propScale ?? 1.0) : internalScale;
+  const selectedBox = externalControls ? (propSelectedBox ?? null) : internalSelectedBox;
   const variableFields = propVariableFields ?? localVariableFields;
-  
-  // Handle variable fields change with prop callback if provided
-  const handleVariableFieldsChange = useCallback((fields: VariableField[]) => {
-    if (onVariableFieldsChange) {
+
+  // Unified state setters for controlled/uncontrolled state
+  const setCurrentPageHandler = useCallback((newPage: number) => {
+    if (externalControls) {
+      onPageChange?.(newPage, numPages);
+    } else {
+      setInternalCurrentPage(newPage);
+    }
+  }, [externalControls, onPageChange, numPages]);
+
+  const setScaleHandler = useCallback((newScale: number) => {
+    if (externalControls) {
+      propOnScaleChange?.(newScale);
+    } else {
+      setInternalScale(newScale);
+    }
+  }, [externalControls, propOnScaleChange]);
+
+  const setSelectedBoxHandler = useCallback((box: BoundingBox | null) => {
+    if (externalControls) {
+      onBoxSelect?.(box);
+    } else {
+      setInternalSelectedBox(box);
+    }
+  }, [externalControls, onBoxSelect]);
+
+  const setVariableFieldsHandler = useCallback((fields: VariableField[]) => {
+    if (externalControls && onVariableFieldsChange) {
       onVariableFieldsChange(fields);
     } else {
       setLocalVariableFields(fields);
     }
-  }, [onVariableFieldsChange]);
+  }, [externalControls, onVariableFieldsChange]);
+
+  // Handle variable fields change with the unified setter
+  const handleVariableFieldsChange = setVariableFieldsHandler;
 
   // Handle file change with the service function
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,7 +165,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       setError(null);
       setRawResults(null);
       setParsedResults(null);
-      setSelectedBox(null);
+      setSelectedBoxHandler(null);
       // Reset variable mappings when a new file is loaded
       setVariableMappings([]);
       setUnmappedBoxIds([]);
@@ -288,7 +325,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     setShowVariables(!showVariables);
   };
 
-  // Modified renderBoundingBoxes to handle variable fields
+  // Updated renderBoundingBoxes to use effective state values
   const renderBoundingBoxes = useCallback((pageElement: Element) => {
     if (!parsedResults || !canvasRef.current || !currentPage) return;
     
@@ -309,7 +346,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     // Find page data that contains boxes for the current page
     const currentPageBoxes = parsedResults.pages
       .flatMap(page => page.boxes)
-      .filter(box => box.page === currentPage);
+      .filter(box => box.page === currentPage); // Use effective currentPage
     
     if (currentPageBoxes.length === 0) return;
     
@@ -393,8 +430,10 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
   
   // Effect to load saved PDF data when provided through props
   useEffect(() => {
+    console.log('PdfProcessor: checking for loadedPdfData', !!props.loadedPdfData);
     if (props.loadedPdfData && props.loadedPdfData.pdfData) {
       try {
+        console.log('PdfProcessor: attempting to load PDF from loadedPdfData');
         // Use the service function to create a File from base64
         const { file: pdfFile, objectUrl, error } = createPdfFileFromBase64(
           props.loadedPdfData.pdfData,
@@ -402,11 +441,13 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
         );
         
         if (error || !pdfFile) {
+          console.error('PdfProcessor: Failed to create PDF file:', error);
           setError(error || "Failed to create PDF file");
           return;
         }
         
         // Set the file and object URL
+        console.log('PdfProcessor: Successfully created PDF file, setting state');
         setFile(pdfFile);
         setPdfUrl(objectUrl);
         setRawPdfData(props.loadedPdfData.pdfData);
@@ -427,15 +468,18 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
           onBoxesLoaded(allBoxes, null);
         }
       } catch (err) {
+        console.error(`PdfProcessor: Error loading saved PDF:`, err);
         setError(`Error loading saved PDF: ${err instanceof Error ? err.message : String(err)}`);
       }
+    } else {
+      console.log('PdfProcessor: No loadedPdfData available');
     }
   }, [props.loadedPdfData, onBoxesLoaded, externalControls]);
   
   // Updated document load success handler to notify parent
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    setCurrentPage(1);
+    setCurrentPageHandler(1);
     
     // Notify parent component if needed
     if (onPageChange && externalControls) {
@@ -453,23 +497,17 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     }
   }, [parsedResults, renderBoundingBoxes]);
 
-  // Update page with notification to parent
+  // Update page change to use unified setter
   const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-    if (onPageChange && externalControls) {
-      onPageChange(newPage, numPages);
-    }
+    setCurrentPageHandler(newPage);
   };
 
-  // Update box selection with notification to parent
+  // Update box selection to use unified setter
   const handleBoxSelection = (box: BoundingBox | null) => {
-    setSelectedBox(box);
-    if (onBoxSelect && externalControls) {
-      onBoxSelect(box);
-    }
+    setSelectedBoxHandler(box);
   };
 
-  // Handle mouse down with updated selection handler
+  // Updated mouse handlers to use effective state values and unified setters
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!parsedResults || !canvasRef.current) return;
     
@@ -486,7 +524,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     
     const currentPageBoxes = parsedResults.pages
       .flatMap(page => page.boxes)
-      .filter(box => box.page === currentPage);
+      .filter(box => box.page === currentPage); // Use effective currentPage
     
     let foundBox = null;
     for (const box of currentPageBoxes) {
@@ -504,13 +542,13 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     }
     
     if (foundBox) {
-      handleBoxSelection(foundBox);
+      setSelectedBoxHandler(foundBox); // Use unified setter
       setIsDragging(true);
       setDragStart({ x: mouseX, y: mouseY });
       
       // No need to set pointer-events as we're keeping it as 'auto'
     } else {
-      handleBoxSelection(null);
+      setSelectedBoxHandler(null); // Use unified setter
     }
   };
 
@@ -558,7 +596,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       .find(box => box.id === selectedBox.id);
     
     if (updatedBox) {
-      handleBoxSelection(updatedBox);
+      setSelectedBoxHandler(updatedBox); // Use unified setter
     }
   };
 
@@ -571,12 +609,12 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     setIsDragging(false);
   };
 
-  // Handle coordinate change with notification to parent
+  // Update coordinate change to use unified setter
   const handleCoordinateChange = (
     field: 'x' | 'y' | 'width' | 'height',
     value: string
   ) => {
-    if (!selectedBox || !parsedResults) return;
+    if (!selectedBox || !parsedResults) return; // Use effective selectedBox
     
     const numValue = parseInt(value, 10);
     if (isNaN(numValue)) return;
@@ -602,7 +640,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       .find(box => box.id === selectedBox.id);
     
     if (updatedBox) {
-      handleBoxSelection(updatedBox);
+      setSelectedBoxHandler(updatedBox); // Use unified setter
       
       // Notify parent if needed
       if (onCoordinateChange && externalControls) {
@@ -612,9 +650,9 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
   };
 
   // Method for external components to select a box by ID
-  const selectBoxById = (boxId: string | null) => {
+  const selectBoxById = useCallback((boxId: string | null) => {
     if (!boxId || !parsedResults) {
-      handleBoxSelection(null);
+      setSelectedBoxHandler(null); // Use unified setter
       return;
     }
     
@@ -623,14 +661,16 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       .find(box => box.id === boxId);
     
     if (boxToSelect) {
-      if (boxToSelect.page !== currentPage) {
-        handlePageChange(boxToSelect.page);
-        setTimeout(() => handleBoxSelection(boxToSelect), 100);
+      if (boxToSelect.page !== currentPage) { // Use effective currentPage
+        setCurrentPageHandler(boxToSelect.page); // Use unified setter
+        setTimeout(() => setSelectedBoxHandler(boxToSelect), 100); // Use unified setter
       } else {
-        handleBoxSelection(boxToSelect);
+        setSelectedBoxHandler(boxToSelect); // Use unified setter
       }
+    } else {
+      setSelectedBoxHandler(null); // Use unified setter
     }
-  };
+  }, [parsedResults, currentPage, setCurrentPageHandler, setSelectedBoxHandler]);
 
   // Expose methods to parent component through ref
   useImperativeHandle(ref, () => ({
@@ -768,35 +808,40 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     pdfUrl: string | null;
     rawPdfData: string | null;
     parsedResults: PdfResults | null;
-    currentPage: number;
-    scale: number;
+    currentPage: number; // Always save the effective current page
+    scale: number; // Always save the effective scale
+    selectedBoxId: string | null; // Save the selected box ID
     variableFields: VariableField[];
     variableMappings: VariableMapping[];
     unmappedBoxIds: string[];
     showVariables: boolean;
+    numPages: number; // Add numPages to saved state
   }
 
   // Save the current state to localStorage
   const saveCurrentState = async () => {
-    if (!file) return;
+    if (!file && !parsedResults) return; // Only save if we have data
     
     try {
       const savedState: PdfProcessorSavedState = {
-        fileName: file.name,
-        fileType: file.type,
-        fileData: await fileToBase64(file),
+        fileName: file ? file.name : null,
+        fileType: file ? file.type : null,
+        fileData: file ? await fileToBase64(file) : null,
         pdfUrl,
         rawPdfData,
         parsedResults,
-        currentPage,
-        scale,
-        variableFields: variableFields || [],
+        currentPage: currentPage, // Save the effective current page
+        scale: scale, // Save the effective scale
+        selectedBoxId: selectedBox?.id || null, // Save selected box ID, ensuring string or null
+        variableFields: variableFields, // Save the effective variable fields
         variableMappings,
         unmappedBoxIds,
-        showVariables
+        showVariables,
+        numPages: numPages // Save numPages
       };
       
       localStorage.setItem('pdf-processor-state', JSON.stringify(savedState));
+      console.log('Saved PDF processor state');
     } catch (err) {
       console.error("Failed to save PDF processor state:", err);
     }
@@ -809,6 +854,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       if (!savedStateString) return;
       
       const savedState: PdfProcessorSavedState = JSON.parse(savedStateString);
+      console.log('Restoring PDF processor state');
       
       // Recreate the file object from the saved data
       if (savedState.fileData && savedState.fileName && savedState.fileType) {
@@ -817,25 +863,53 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
         setFile(newFile);
       }
       
+      // Restore basic PDF data
       if (savedState.pdfUrl) setPdfUrl(savedState.pdfUrl);
       if (savedState.rawPdfData) setRawPdfData(savedState.rawPdfData);
       if (savedState.parsedResults) setParsedResults(savedState.parsedResults);
-      if (savedState.currentPage) setCurrentPage(savedState.currentPage);
-      if (savedState.scale) setScale(savedState.scale);
+      
+      // Restore numPages
+      if (savedState.numPages) setNumPages(savedState.numPages);
       
       // Restore variable information
-      if (savedState.variableFields && !propVariableFields) {
-        setLocalVariableFields(savedState.variableFields);
+      if (savedState.variableFields) {
+        setVariableFieldsHandler(savedState.variableFields); // Use handler
       }
       
       if (savedState.variableMappings) setVariableMappings(savedState.variableMappings);
       if (savedState.unmappedBoxIds) setUnmappedBoxIds(savedState.unmappedBoxIds);
       if (savedState.showVariables !== undefined) setShowVariables(savedState.showVariables);
       
+      // Restore page and scale using handlers (which handle external vs internal appropriately)
+      if (savedState.currentPage) {
+        setCurrentPageHandler(savedState.currentPage);
+      }
+      
+      if (savedState.scale) {
+        setScaleHandler(savedState.scale);
+      }
+      
+      // Restore selection using selectBoxById with a slight delay to ensure parsedResults is set
+      setTimeout(() => {
+        if (savedState.selectedBoxId) {
+          selectBoxById(savedState.selectedBoxId);
+        } else {
+          selectBoxById(null); // Clear selection if none was saved
+        }
+      }, 100);
+      
       // Notify parent component about loaded boxes if callback provided
       if (onBoxesLoaded && externalControls && savedState.parsedResults) {
         const allBoxes = savedState.parsedResults.pages.flatMap(page => page.boxes);
-        onBoxesLoaded(allBoxes, null);
+        // Find the selected box based on ID
+        const restoredSelectedBox = savedState.selectedBoxId 
+          ? allBoxes.find(box => box.id === savedState.selectedBoxId) || null
+          : null;
+        
+        // Use setTimeout to ensure boxes are loaded after state is restored
+        setTimeout(() => {
+          onBoxesLoaded(allBoxes, restoredSelectedBox);
+        }, 100);
       }
       
       return savedState;
@@ -843,7 +917,23 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       console.error("Failed to restore PDF processor state:", err);
       return null;
     }
-  }, [onBoxesLoaded, externalControls, propVariableFields]);
+  }, [externalControls, onBoxesLoaded, setCurrentPageHandler, setScaleHandler, setVariableFieldsHandler, selectBoxById]);
+
+  // Effect to restore state when component mounts
+  useEffect(() => {
+    // Only attempt to restore state if we don't have a PDF loaded already and we're not using loadedPdfData
+    if (!file && !props.loadedPdfData) {
+      restoreState();
+    }
+  }, [restoreState, file, props.loadedPdfData]);
+
+  // Effect to notify parent of box selection updates
+  useEffect(() => {
+    if (externalControls && parsedResults && onBoxesLoaded) {
+      const allBoxes = parsedResults.pages.flatMap(page => page.boxes);
+      onBoxesLoaded(allBoxes, selectedBox); // Use effective selectedBox
+    }
+  }, [externalControls, parsedResults, selectedBox, onBoxesLoaded]);
 
   // Function to print filled PDF with variable values - updated to use service function
   const printPdf = async () => {
@@ -882,23 +972,6 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     }
   };
 
-  // Effect to restore state from localStorage when component mounts
-  useEffect(() => {
-    // Only attempt to restore state if we don't have a PDF loaded already and we're not using loadedPdfData
-    if (!file && !props.loadedPdfData) {
-      restoreState();
-    }
-  }, [restoreState, file, props.loadedPdfData]);
-
-  // When component mounts or updates with external controls prop change
-  useEffect(() => {
-    // If using external controls, make all boxes data available
-    if (externalControls && parsedResults && onBoxesLoaded) {
-      const allBoxes = parsedResults.pages.flatMap(page => page.boxes);
-      onBoxesLoaded(allBoxes, selectedBox);
-    }
-  }, [externalControls, parsedResults, selectedBox, onBoxesLoaded, handleVariableFieldsChange]);
-
   return (
     <div className="pdf-processor">
       <div className="pdf-processor-header">
@@ -920,6 +993,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
               <button 
                 onClick={processFile} 
                 disabled={!file || isProcessing}
+                className="process-button"
               >
                 {isProcessing ? 'Processing...' : 'Extract Text & Bounding Boxes'}
               </button>
@@ -929,6 +1003,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
                   onClick={saveBoundingBoxData}
                   className="save-button"
                   title="Save bounding box data to use on form creation page"
+                  disabled={isProcessing}
                 >
                   Save Bounding Box Data
                 </button>
@@ -938,6 +1013,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
                 onClick={loadBoundingBoxData}
                 className="load-button"
                 title="Load bounding box data from a JSON file"
+                disabled={isProcessing}
               >
                 Load Bounding Box Data
               </button>
@@ -947,6 +1023,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
                   onClick={printPdf}
                   className="save-filled-pdf-button"
                   title="Print filled PDF with variable values"
+                  disabled={isProcessing}
                 >
                   Print PDF
                 </button>
@@ -957,6 +1034,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
                   onClick={toggleVariableView}
                   className="toggle-view-button"
                   title="Toggle between variables and bounding boxes"
+                  disabled={isProcessing}
                 >
                   {showVariables ? 'Show Bounding Boxes' : 'Show Variables'}
                 </button>
@@ -985,23 +1063,23 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
                   {!externalControls && (
                     <div className="pdf-controls">
                       <button 
-                        onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
-                        disabled={currentPage <= 1}
+                        onClick={() => handlePageChange(Math.max(internalCurrentPage - 1, 1))}
+                        disabled={internalCurrentPage <= 1}
                       >
                         Previous
                       </button>
                       <span>
-                        Page {currentPage} of {numPages}
+                        Page {internalCurrentPage} of {numPages}
                       </span>
                       <button 
-                        onClick={() => handlePageChange(Math.min(currentPage + 1, numPages))}
-                        disabled={currentPage >= numPages}
+                        onClick={() => handlePageChange(Math.min(internalCurrentPage + 1, numPages))}
+                        disabled={internalCurrentPage >= numPages}
                       >
                         Next
                       </button>
                       <select 
-                        value={scale} 
-                        onChange={e => setScale(parseFloat(e.target.value))}
+                        value={internalScale}
+                        onChange={e => setInternalScale(parseFloat(e.target.value))}
                       >
                         <option value="0.5">50%</option>
                         <option value="0.75">75%</option>
@@ -1019,8 +1097,8 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
                       error="Failed to load PDF"
                     >
                       <Page 
-                        pageNumber={currentPage}
-                        scale={scale}
+                        pageNumber={currentPage} // Use effective currentPage
+                        scale={scale} // Use effective scale
                         onRenderSuccess={onPageRender}
                         renderTextLayer={false}
                         renderAnnotationLayer={false}
@@ -1041,7 +1119,8 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
             
             {!pdfUrl && (
               <div className="no-pdf-placeholder">
-                <p>Upload a PDF to begin processing</p>
+                <p>No PDF document loaded</p>
+                <p className="pdf-instruction">Please upload a PDF file to begin</p>
               </div>
             )}
           </div>

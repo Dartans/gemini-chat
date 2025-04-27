@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { UserResource } from '@clerk/types';
 import useCookie from '../hooks/useCookie';
 import SideMenu, { SideMenuButton } from './SideMenu';
 import './Sidebar.css';
@@ -27,6 +28,7 @@ interface SidebarProps {
   onLoadSavedPdf?: (pdfId: string) => void;
   onSaveState?: () => void;     // Add prop for saving state
   onRestoreState?: () => void;  // Add prop for restoring state
+  user?: UserResource | null;   // Add user prop from Clerk
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -36,10 +38,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeTool,
   onLoadSavedPdf,
   onSaveState,
-  onRestoreState
+  onRestoreState,
+  user
 }) => {
   const [savedPdfs] = useCookie('savedPdfs', '[]');
-  const [systemInstruction, setSystemInstruction] = useState<string>('');
 
   // Convert navigation items to SideMenuButtons
   const sideMenuButtons: SideMenuButton[] = navigationItems.map(item => ({
@@ -59,17 +61,26 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-content">
           <div className="sidebar-header">
             <h2>PDF Tools</h2>
+            {user && (
+              <div className="sidebar-user-info">
+                <img 
+                  src={user.imageUrl} 
+                  alt={user.firstName || 'User'} 
+                  className="sidebar-user-avatar" 
+                />
+                <span className="sidebar-username">{user.firstName || user.username}</span>
+              </div>
+            )}
           </div>
           
           {/* Replace with SideMenu component */}
           <SideMenu
             buttons={sideMenuButtons}
-            systemInstruction={systemInstruction}
-            setSystemInstruction={setSystemInstruction}
             onLoadSavedPdf={onLoadSavedPdf}
             isPdfProcessorOpen={activeTool === 'pdfProcessor'}
             onSaveState={onSaveState}         // Pass save state handler
             onRestoreState={onRestoreState}   // Pass restore state handler
+            user={user}                       // Pass user to SideMenu
           />
         </div>
       )}

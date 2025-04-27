@@ -430,12 +430,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
   height: 300px;
   background-color: #f8f8f8;
   border: 1px dashed #ccc;
   border-radius: 4px;
   color: #666;
-  font-style: italic;
+}
+
+.no-pdf-placeholder p {
+  margin: 5px 0;
+}
+
+.no-pdf-placeholder p:first-child {
+  font-size: 18px;
+  color: #555;
+}
+
+.pdf-instruction {
+  font-size: 14px;
+  color: #888;
 }
 
 .box-editor-section {

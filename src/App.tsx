@@ -1,4 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { 
+  SignIn, 
+  SignUp, 
+  SignedIn, 
+  SignedOut, 
+  UserButton,
+  useUser
+} from '@clerk/clerk-react';
 import ApiKeyInput from './components/ApiKeyInput';
 import PdfProcessor, { PdfProcessorRef } from './components/PdfProcessor';
 import VariableFieldsManager from './components/VariableFieldsManager';
@@ -8,10 +16,15 @@ import Sidebar from './components/Sidebar';
 import { BoundingBox, VariableField } from './types/pdfTypes';
 import './App.css';
 
+// Add these type assertions at the top of the component to fix TypeScript errors
+const TypedSignedIn = SignedIn as React.ComponentType<{children: React.ReactNode}>;
+const TypedSignedOut = SignedOut as React.ComponentType<{children: React.ReactNode}>;
+
 // Define tool types for our application
 type Tool = 'pdfProcessor' | 'variableEditor';
 
 const App: React.FC = () => {
+  const { user, isSignedIn } = useUser();
   const [apiKey] = useCookie('geminiApiKey');
   const [pdfBoundingBoxes] = useCookie('pdfBoundingBoxes', '{}');
   const [hasApiKey, setHasApiKey] = React.useState(!!apiKey);
@@ -204,6 +217,30 @@ const App: React.FC = () => {
 
   // Render main content based on active tool
   const renderMainContent = () => {
+    // Check for Clerk authentication first
+    if (!isSignedIn) {
+      return (
+        <div className="auth-container">
+          <h1>Welcome to PDF Tools</h1>
+          <p>Please sign in or sign up to continue</p>
+          <div className="auth-tabs">
+            <TypedSignedOut>
+              <div className="auth-options">
+                <div className="auth-option">
+                  <h2>Sign In</h2>
+                  <SignIn />
+                </div>
+                <div className="auth-option">
+                  <h2>Sign Up</h2>
+                  <SignUp />
+                </div>
+              </div>
+            </TypedSignedOut>
+          </div>
+        </div>
+      );
+    }
+    
     if (!hasApiKey) {
       return <ApiKeyInput onApiKeySubmit={handleApiKeySubmit} />;
     }
@@ -423,8 +460,15 @@ const App: React.FC = () => {
         onLoadSavedPdf={handleLoadSavedPdf}
         onSaveState={saveCurrentState}
         onRestoreState={restoreState}
+        user={user} // Pass user to Sidebar
       />
       <div className="main-content">
+        <TypedSignedIn>
+          <div className="user-profile">
+            <UserButton />
+            {user && <span className="user-name">Welcome, {user.firstName || user.username}</span>}
+          </div>
+        </TypedSignedIn>
         {renderMainContent()}
       </div>
     </div>
