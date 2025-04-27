@@ -1,15 +1,24 @@
 import React, { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { GoogleGenAI } from '@google/genai';
-import { pdfjs, Document, Page } from 'react-pdf';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { Document, Page } from 'react-pdf';
+import { pdfjs } from 'react-pdf';
 import useCookie from '../hooks/useCookie';
-import { processPdfWithGemini, mapVariablesToBoxes } from '../services/pdfService';
+import { 
+  mapVariablesToBoxes, 
+  processFileWithGemini,
+  printFilledPdf
+} from '../services/pdfService';
+import { 
+  handlePdfFileChange, 
+  saveBoundingBoxData as saveBoundingBoxDataService,
+  loadBoundingBoxData as loadBoundingBoxDataService,
+  createPdfFileFromBase64
+} from '../services/pdfFileService';
 import { BoundingBox, PdfResults, VariableField, VariableMapping, FieldMappingResult } from '../types/pdfTypes';
 import './PdfProcessor.css';
-import VariableFieldsManager from './VariableFieldsManager';
+// Remove unused import
 import './VariableFieldsManager.css';
-// Import the new utility functions
-import { normalizeCoordinates, denormalizeCoordinates } from '../utils/pdfCoordinateUtils';
+// Import only the used utility function
+import { normalizeCoordinates } from '../utils/pdfCoordinateUtils';
 
 // Configure pdf.js worker using import.meta.url for better module resolution
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -46,6 +55,13 @@ export interface PdfProcessorRef {
   getSelectedBox: () => BoundingBox | null;
   mapFields: (fields?: VariableField[]) => Promise<VariableField[] | void>; // Update signature to accept fields and return updated fields
   updateBoxNames: (fields: VariableField[]) => void; // Add this function to the ref interface
+  printPdf: () => Promise<void>; // Add the printPdf function to the ref interface
+  isProcessing: boolean;
+  handleFileChange: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  processFile: () => Promise<void>;
+  saveBoundingBoxData: () => Promise<void>;
+  loadBoundingBoxData: () => Promise<void>;
+  toggleVariableView: () => void;
 }
 
 const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref) => {
@@ -62,9 +78,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
   } = props;
   
   const [apiKey] = useCookie('geminiApiKey');
-  // Add cookie state to save bounding box data
-  const [pdfBoundingBoxes, setPdfBoundingBoxes] = useCookie('pdfBoundingBoxes', '{}');
-  const [savedPdfs, setSavedPdfs] = useCookie('savedPdfs', '[]');
+  // Remove unused cookie state variables
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [rawPdfData, setRawPdfData] = useState<string | null>(null);
@@ -88,7 +102,8 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
   const [localVariableFields, setLocalVariableFields] = useState<VariableField[]>([]);
   const [variableMappings, setVariableMappings] = useState<VariableMapping[]>([]);
   const [unmappedBoxIds, setUnmappedBoxIds] = useState<string[]>([]);
-  const [isMappingInProgress, setIsMappingInProgress] = useState(false);
+  // Keep this variable but mark it as intended to be unused with underscore prefix
+  const [_isMappingInProgress, setIsMappingInProgress] = useState(false);
   const [showVariables, setShowVariables] = useState(true);
 
   // Use props variable fields if provided, otherwise use local state
@@ -103,13 +118,11 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     }
   }, [onVariableFieldsChange]);
 
-  // Handle file change with base64 PDF storage
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file change with the service function
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const selectedFile = event.target.files[0];
       setFile(selectedFile);
-      const objectUrl = URL.createObjectURL(selectedFile);
-      setPdfUrl(objectUrl);
       setError(null);
       setRawResults(null);
       setParsedResults(null);
@@ -118,20 +131,25 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       setVariableMappings([]);
       setUnmappedBoxIds([]);
       
-      // Read the PDF file as base64 for storage
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target && e.target.result) {
-          // Get base64 string (remove metadata prefix)
-          const base64String = e.target.result.toString().split(',')[1];
-          setRawPdfData(base64String);
+      // Use the service function instead of implementing the file reading here
+      try {
+        const result = await handlePdfFileChange(selectedFile);
+        
+        if (result.error) {
+          setError(result.error);
+          return;
         }
-      };
-      reader.readAsDataURL(selectedFile);
+        
+        setPdfUrl(result.objectUrl);
+        setRawPdfData(result.rawPdfData);
+      } catch (err) {
+        console.error("Error handling PDF file:", err);
+        setError(`Error handling PDF file: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   };
 
-  // Process file updated to notify parent when results are ready
+  // Process file updated to use the new service function
   const processFile = async () => {
     if (!file || !apiKey) {
       setError("Missing file or API key");
@@ -142,73 +160,45 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     setError(null);
     
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const uploadedFile = await ai.files.upload({
-        file: file,
-      });
+      // Use the service function instead of implementing file processing here
+      const result = await processFileWithGemini(file, apiKey);
 
-      if (!uploadedFile.uri || !uploadedFile.mimeType) {
-        setError("Failed to upload file or get file details.");
-        setIsProcessing(false);
-        return;
+      setRawResults(result.rawResults || "No results returned");
+      setParsedResults(result.parsedResults);
+      
+      if (result.error) {
+        setError(result.error);
       }
       
-      const result = await processPdfWithGemini(
-        apiKey, 
-        uploadedFile.uri, 
-        uploadedFile.mimeType
-      );
-      
-      setRawResults(result || "No results returned");
-      
-      if (result) {
-        try {
-          const parsedData = JSON.parse(result) as PdfResults;
-          
-          // Add unique ids to each bounding box
-          const processedData = {
-            pages: parsedData.pages.map(page => ({
-              boxes: page.boxes.map((box, index) => ({
-                ...box,
-                id: `box-${page.boxes[0]?.page || 0}-${index}`,
-              }))
-            }))
-          };
-          
-          setParsedResults(processedData);
-          // Reset variable mappings when new boxes are extracted
-          setVariableMappings([]);
-          setUnmappedBoxIds([]);
-          
-          // Auto-create variable fields based on extracted boxes
-          const extractedFields = processedData.pages
-            .flatMap(page => page.boxes)
-            .map(box => ({
-              id: `field-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              name: box.text.replace(/[^\w\s]/g, '').trim(),
-              value: '',
-              boxId: box.id
-            }));
-          
-          // Only set auto-created fields if no fields exist yet
-          if (variableFields.length === 0) {
-            handleVariableFieldsChange(extractedFields);
-          }
-          
-          // Set all boxes as unmapped initially
-          setUnmappedBoxIds(processedData.pages.flatMap(page => 
-            page.boxes.map(box => box.id || '')
-          ).filter(id => id));
-          
-          // Notify parent component about loaded boxes if callback provided
-          if (onBoxesLoaded && externalControls) {
-            const allBoxes = processedData.pages.flatMap(page => page.boxes);
-            onBoxesLoaded(allBoxes, null);
-          }
-        } catch (parseError) {
-          console.error("Error parsing results:", parseError);
-          setError("Failed to parse results as JSON.");
+      if (result.parsedResults) {
+        // Reset variable mappings when new boxes are extracted
+        setVariableMappings([]);
+        setUnmappedBoxIds([]);
+        
+        // Auto-create variable fields based on extracted boxes
+        const extractedFields = result.parsedResults.pages
+          .flatMap(page => page.boxes)
+          .map(box => ({
+            id: `field-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: box.text.replace(/[^\w\s]/g, '').trim(),
+            value: '',
+            boxId: box.id
+          }));
+        
+        // Only set auto-created fields if no fields exist yet
+        if (variableFields.length === 0) {
+          handleVariableFieldsChange(extractedFields);
+        }
+        
+        // Set all boxes as unmapped initially
+        setUnmappedBoxIds(result.parsedResults.pages.flatMap(page => 
+          page.boxes.map(box => box.id || '')
+        ).filter(id => id));
+        
+        // Notify parent component about loaded boxes if callback provided
+        if (onBoxesLoaded && externalControls) {
+          const allBoxes = result.parsedResults.pages.flatMap(page => page.boxes);
+          onBoxesLoaded(allBoxes, null);
         }
       }
     } catch (err) {
@@ -403,23 +393,19 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
   useEffect(() => {
     if (props.loadedPdfData && props.loadedPdfData.pdfData) {
       try {
-        // Convert base64 back to blob
-        const byteCharacters = atob(props.loadedPdfData.pdfData);
-        const byteNumbers = new Array(byteCharacters.length);
+        // Use the service function to create a File from base64
+        const { file: pdfFile, objectUrl, error } = createPdfFileFromBase64(
+          props.loadedPdfData.pdfData,
+          props.loadedPdfData.fileName
+        );
         
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        if (error || !pdfFile) {
+          setError(error || "Failed to create PDF file");
+          return;
         }
         
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: 'application/pdf' });
-        
-        // Create a File object from the blob
-        const pdfFile = new File([blob], props.loadedPdfData.fileName, { type: 'application/pdf' });
-        
-        // Set the file and create object URL
+        // Set the file and object URL
         setFile(pdfFile);
-        const objectUrl = URL.createObjectURL(blob);
         setPdfUrl(objectUrl);
         setRawPdfData(props.loadedPdfData.pdfData);
         
@@ -654,155 +640,103 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     getAllBoxes: () => parsedResults ? parsedResults.pages.flatMap(page => page.boxes) : [],
     getSelectedBox: () => selectedBox,
     mapFields: handleMapFields, // Expose mapFields function
-    updateBoxNames: handleVariableFieldsChange // Expose updateBoxNames function
+    updateBoxNames: handleVariableFieldsChange, // Expose updateBoxNames function
+    printPdf, // Expose printPdf function
+    isProcessing,
+    handleFileChange,
+    processFile,
+    saveBoundingBoxData,
+    loadBoundingBoxData,
+    toggleVariableView
   }));
 
   // Function to save bounding box data to a local JSON file
-  const saveBoundingBoxData = () => {
+  const saveBoundingBoxData = async () => {
     if (!parsedResults || !rawPdfData || !file) {
       setError("Missing PDF data or bounding boxes to save");
       return;
     }
 
-    // Create unique ID for this saved PDF
-    const pdfId = `pdf-${new Date().getTime()}`;
-    
-    // Create data object with PDF filename and bounding boxes
-    const boundingBoxData = {
-      id: pdfId,
-      fileName: file.name,
-      timestamp: new Date().toISOString(),
-      data: parsedResults,
-      pdfData: rawPdfData,
-      // Also save variable fields and mappings if they exist
-      variableFields: variableFields.length > 0 ? variableFields : undefined,
-      variableMappings: variableMappings.length > 0 ? variableMappings : undefined,
-      unmappedBoxIds: unmappedBoxIds.length > 0 ? unmappedBoxIds : undefined
-    };
-
     try {
-      // Convert data to JSON string
-      const jsonData = JSON.stringify(boundingBoxData, null, 2);
+      // Use the service function instead of implementing the save logic here
+      const result = saveBoundingBoxDataService(
+        parsedResults, 
+        rawPdfData, 
+        file, 
+        variableFields, 
+        variableMappings, 
+        unmappedBoxIds
+      );
       
-      // Create a blob with the JSON data
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      
-      // Create a download link and trigger the download
-      const downloadLink = document.createElement('a');
-      downloadLink.href = URL.createObjectURL(blob);
-      downloadLink.download = `${file.name.replace(/\.[^/.]+$/, '')}-bounding-boxes.json`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-      
-      // Show success message
-      setSaveSuccess(true);
-      // Hide success message after 3 seconds
-      setTimeout(() => setSaveSuccess(false), 3000);
+      if (result.success) {
+        // Show success message
+        setSaveSuccess(true);
+        // Hide success message after 3 seconds
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else if (result.error) {
+        setError(result.error);
+      }
     } catch (err) {
       setError(`Failed to save data: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
   // Function to load bounding box data from a local JSON file
-  const loadBoundingBoxData = () => {
-    // Create a hidden file input element
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'application/json';
-    fileInput.style.display = 'none';
-    
-    // Handle file selection
-    fileInput.addEventListener('change', (event) => {
-      const target = event.target as HTMLInputElement;
-      if (!target.files || !target.files[0]) return;
+  const loadBoundingBoxData = async () => {
+    try {
+      // Use the service function instead of implementing the load logic here
+      const loadedData = await loadBoundingBoxDataService();
       
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          if (e.target?.result) {
-            // Parse the JSON file
-            const loadedData = JSON.parse(e.target.result as string);
-            
-            // Basic validation
-            if (!loadedData.data || !loadedData.pdfData || !loadedData.fileName) {
-              throw new Error("Invalid bounding box data format");
-            }
-            
-            // Convert base64 back to blob
-            const byteCharacters = atob(loadedData.pdfData);
-            const byteNumbers = new Array(byteCharacters.length);
-            
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'application/pdf' });
-            
-            // Create a File object from the blob
-            const pdfFile = new File([blob], loadedData.fileName, { type: 'application/pdf' });
-            
-            // Set the file and create object URL
-            setFile(pdfFile);
-            const objectUrl = URL.createObjectURL(blob);
-            setPdfUrl(objectUrl);
-            setRawPdfData(loadedData.pdfData);
-            
-            // Set the parsed results directly
-            setParsedResults(loadedData.data);
-            
-            // Load variable fields and mappings if they exist
-            if (loadedData.variableFields) {
-              handleVariableFieldsChange(loadedData.variableFields);
-            }
-            
-            if (loadedData.variableMappings) {
-              setVariableMappings(loadedData.variableMappings);
-            }
-            
-            if (loadedData.unmappedBoxIds) {
-              setUnmappedBoxIds(loadedData.unmappedBoxIds);
-            } else {
-              // Set all boxes as unmapped
-              const allBoxIds = loadedData.data.pages.flatMap((page: any) => 
-                page.boxes.map((box: any) => box.id || '')
-              ).filter((id: string) => id);
-              setUnmappedBoxIds(allBoxIds);
-            }
-            
-            // Notify parent component about loaded boxes if callback provided
-            if (onBoxesLoaded && externalControls) {
-              const allBoxes = loadedData.data.pages.flatMap((page: any) => page.boxes);
-              onBoxesLoaded(allBoxes, null);
-            }
-            
-            // Show success message
-            setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 3000);
-          }
-        } catch (err) {
-          setError(`Error loading bounding box data: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      };
+      // Set the file and create object URL
+      setFile(loadedData.file);
+      setPdfUrl(loadedData.objectUrl);
+      setRawPdfData(loadedData.rawPdfData);
       
-      reader.readAsText(target.files[0]);
-    });
-    
-    // Trigger the file input click
-    document.body.appendChild(fileInput);
-    fileInput.click();
-    document.body.removeChild(fileInput);
+      // Set the parsed results directly
+      setParsedResults(loadedData.parsedResults);
+      
+      // Load variable fields and mappings if they exist
+      if (loadedData.variableFields) {
+        handleVariableFieldsChange(loadedData.variableFields);
+      }
+      
+      if (loadedData.variableMappings) {
+        setVariableMappings(loadedData.variableMappings);
+      }
+      
+      if (loadedData.unmappedBoxIds) {
+        setUnmappedBoxIds(loadedData.unmappedBoxIds);
+      } else {
+        // Set all boxes as unmapped
+        const allBoxIds = loadedData.parsedResults.pages.flatMap(page => 
+          page.boxes.map(box => box.id || '')
+        ).filter(id => id);
+        setUnmappedBoxIds(allBoxIds);
+      }
+      
+      // Notify parent component about loaded boxes if callback provided
+      if (onBoxesLoaded && externalControls) {
+        const allBoxes = loadedData.parsedResults.pages.flatMap(page => page.boxes);
+        onBoxesLoaded(allBoxes, null);
+      }
+      
+      // Show success message
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      setError(`Error loading bounding box data: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   // Define an interface for the items in filledFields
-  interface FilledFieldItem {
+  type _FilledFieldItem = {
     field: VariableField;
     box: BoundingBox; // Mark box as non-optional since we filter undefined ones
   }
 
   // Define an interface for the structure being built in the reduce function
-  interface FieldsByPageJSONAccumulator {
+  type _FieldsByPageJSONAccumulator = {
     [key: string]: {
       field: {
         id: string;
@@ -822,7 +756,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     }[];
   }
 
-  // Function to print filled PDF with variable values
+  // Function to print filled PDF with variable values - updated to use service function
   const printPdf = async () => {
     if (!file || !pdfUrl || !variableFields || variableFields.length === 0 || !parsedResults) {
       setError("Missing file or variable fields to print PDF");
@@ -833,238 +767,18 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
     setError(null);
 
     try {
-      // Create a new window with the existing PDF URL
-      const printWindow = window.open('', '_blank');
+      // Use the service function instead of implementing PDF printing logic here
+      const result = await printFilledPdf(
+        file,
+        pdfUrl,
+        variableFields,
+        parsedResults
+      );
       
-      if (!printWindow) {
-        setError("Print window was blocked. Please allow popups and try again.");
-        setIsProcessing(false);
+      if (result.error) {
+        setError(result.error);
         return;
       }
-
-      // Get filled fields with their associated boxes
-      const filledFields = variableFields
-        .filter(field => field.value && field.boxId)
-        .map(field => {
-          const box = parsedResults.pages
-            .flatMap(page => page.boxes)
-            .find(box => box.id === field.boxId);
-          
-          // Return null if box is not found, filter later
-          return box ? { field, box } : null;
-        })
-        .filter((item): item is FilledFieldItem => item !== null && item.box !== undefined); // Ensure item and item.box are defined and type guard
-
-      // Group fields by page
-      const fieldsByPage: Record<number, FilledFieldItem[]> = {}; // Explicitly type fieldsByPage
-      filledFields.forEach(item => {
-        // No need for null check here due to the filter above, TS should infer correctly now
-        const pageNum = item.box.page;
-        if (!fieldsByPage[pageNum]) {
-          fieldsByPage[pageNum] = [];
-        }
-        fieldsByPage[pageNum].push(item);
-      });
-      
-      // Stringify fieldsByPage in a safer way for HTML insertion
-      const fieldsByPageJSON = JSON.stringify(
-        Object.entries(fieldsByPage).reduce((acc: FieldsByPageJSONAccumulator, [pageNum, items]: [string, FilledFieldItem[]]) => { // Type the accumulator and items
-          acc[pageNum] = items.map(item => ({ // item type is now inferred correctly
-            field: {
-              id: item.field.id,
-              name: item.field.name,
-              value: item.field.value,
-              boxId: item.field.boxId
-            },
-            box: {
-              id: item.box.id,
-              x: item.box.x, 
-              y: item.box.y,
-              width: item.box.width,
-              height: item.box.height,
-              page: item.box.page,
-              text: item.box.text
-            }
-          }));
-          return acc;
-        }, {} as FieldsByPageJSONAccumulator) // Initial value for reduce with type assertion
-      );
-
-      // Write HTML content to the new window
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Print PDF - ${file.name}</title>
-          <style>
-            body, html {
-              margin: 0;
-              padding: 0;
-              height: 100%;
-              overflow: auto;
-            }
-            #pdf-container {
-              position: relative;
-              margin: 0 auto;
-            }
-            .page-container {
-              position: relative;
-              margin-bottom: 20px;
-              page-break-after: always;
-              box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-            }
-            .page-container:last-child {
-              page-break-after: auto;
-            }
-            .form-field {
-              position: absolute;
-              background-color: white;
-              color: black;
-              border: none;
-              font-family: Arial, sans-serif;
-              padding: 0px 2px;
-              margin: 0;
-              overflow: hidden;
-              display: flex;
-              align-items: center;
-              text-align: left;
-              line-height: 1.2;
-            }
-            @media print {
-              body {
-                background-color: white;
-              }
-              .controls {
-                display: none;
-              }
-              .page-container {
-                margin: 0;
-                page-break-after: always;
-                box-shadow: none;
-              }
-            }
-            .controls {
-              position: fixed;
-              top: 10px;
-              right: 10px;
-              padding: 10px;
-              background-color: white;
-              border: 1px solid #ccc;
-              border-radius: 5px;
-              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-              z-index: 1000;
-            }
-            .print-button {
-              background-color: #4caf50;
-              color: white;
-              border: none;
-              padding: 8px 16px;
-              font-size: 16px;
-              cursor: pointer;
-              border-radius: 4px;
-            }
-          </style>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-        </head>
-        <body>
-          <div class="controls">
-            <button class="print-button" onclick="window.print(); setTimeout(() => window.close(), 500);">
-              Print
-            </button>
-          </div>
-          <div id="pdf-container"></div>
-          
-          <script>
-            // Set up PDF.js worker
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-
-            // Fields by page from the React app
-            const fieldsByPage = ${fieldsByPageJSON};
-            
-            async function renderPdf() {
-              try {
-                // Load the PDF document
-                const loadingTask = pdfjsLib.getDocument('${pdfUrl}');
-                const pdf = await loadingTask.promise;
-                
-                const container = document.getElementById('pdf-container');
-                const totalPages = pdf.numPages;
-                
-                // Render each page of the PDF
-                for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-                  const page = await pdf.getPage(pageNum);
-                  const viewport = page.getViewport({ scale: 1.5 }); // Adjust scale for better print quality
-                  
-                  // Create page container
-                  const pageContainer = document.createElement('div');
-                  pageContainer.className = 'page-container';
-                  pageContainer.style.width = viewport.width + 'px';
-                  pageContainer.style.height = viewport.height + 'px';
-                  container.appendChild(pageContainer);
-                  
-                  // Create canvas for the PDF page
-                  const canvas = document.createElement('canvas');
-                  canvas.width = viewport.width;
-                  canvas.height = viewport.height;
-                  pageContainer.appendChild(canvas);
-                  
-                  // Render PDF page to canvas
-                  const renderContext = {
-                    canvasContext: canvas.getContext('2d'),
-                    viewport: viewport
-                  };
-                  
-                  await page.render(renderContext).promise;
-                  
-                  // Add form fields for this page if any exist
-                  if (fieldsByPage[pageNum]) {
-                    fieldsByPage[pageNum].forEach(item => {
-                      const { field, box } = item;
-                      
-                      // Create field element
-                      const fieldElement = document.createElement('div');
-                      fieldElement.className = 'form-field';
-                      
-                      // Convert normalized coordinates (0-1000) to actual page coordinates
-                      const x = (box.x / 1000) * viewport.width;
-                      const y = (box.y / 1000) * viewport.height;
-                      const width = (box.width / 1000) * viewport.width;
-                      const height = (box.height / 1000) * viewport.height;
-                      
-                      // Position and size the field
-                      fieldElement.style.left = x + 'px';
-                      fieldElement.style.top = y + 'px';
-                      fieldElement.style.width = width + 'px';
-                      fieldElement.style.height = height + 'px';
-                      
-                      // Set text size based on height (similar to the way it's shown in preview)
-                      fieldElement.style.fontSize = Math.min(height * 0.7, 14) + 'px';
-                      
-                      // Set the field value
-                      fieldElement.textContent = field.value;
-                      
-                      // Add the field to the page
-                      pageContainer.appendChild(fieldElement);
-                    });
-                  }
-                }
-                
-                // Show success message
-                console.log('PDF prepared for printing');
-              } catch (error) {
-                console.error('Error rendering PDF:', error);
-                document.body.innerHTML += '<p>Error rendering PDF: ' + error.message + '</p>';
-              }
-            }
-            
-            // Start rendering when the page has loaded
-            window.onload = renderPdf;
-          </script>
-        </body>
-        </html>
-      `);
-      
-      printWindow.document.close();
       
       // Show success message
       setSaveSuccess(true);
@@ -1086,7 +800,7 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       const allBoxes = parsedResults.pages.flatMap(page => page.boxes);
       onBoxesLoaded(allBoxes, selectedBox);
     }
-  }, [externalControls, parsedResults, selectedBox, onBoxesLoaded]);
+  }, [externalControls, parsedResults, selectedBox, onBoxesLoaded, handleVariableFieldsChange]);
 
   return (
     <div className="pdf-processor">
@@ -1097,69 +811,68 @@ const PdfProcessor = forwardRef<PdfProcessorRef, PdfProcessorProps>((props, ref)
       
       <div className="pdf-processor-content">
         <div className="main-viewer-area">
-          <div className="file-upload">
-            <input 
-              type="file" 
-              accept=".pdf" 
-              onChange={handleFileChange} 
-              disabled={isProcessing} 
-            />
-            <button 
-              onClick={processFile} 
-              disabled={!file || isProcessing}
-            >
-              {isProcessing ? 'Processing...' : 'Extract Text & Bounding Boxes'}
-            </button>
-            
-            {/* Add Save Bounding Box Data button */}
-            {parsedResults && (
+          {/* File input only shown if not using external controls */}
+          {!externalControls && (
+            <div className="file-upload">
+              <input 
+                type="file" 
+                accept=".pdf" 
+                onChange={handleFileChange} 
+                disabled={isProcessing} 
+              />
               <button 
-                onClick={saveBoundingBoxData}
-                className="save-button"
-                title="Save bounding box data to use on form creation page"
+                onClick={processFile} 
+                disabled={!file || isProcessing}
               >
-                Save Bounding Box Data
+                {isProcessing ? 'Processing...' : 'Extract Text & Bounding Boxes'}
               </button>
-            )}
+              
+              {parsedResults && (
+                <button 
+                  onClick={saveBoundingBoxData}
+                  className="save-button"
+                  title="Save bounding box data to use on form creation page"
+                >
+                  Save Bounding Box Data
+                </button>
+              )}
 
-            {/* Add Load Bounding Box Data button */}
-            <button 
-              onClick={loadBoundingBoxData}
-              className="load-button"
-              title="Load bounding box data from a JSON file"
-            >
-              Load Bounding Box Data
-            </button>
-
-            {/* Add Save Filled PDF button */}
-            {variableFields.length > 0 && (
               <button 
-                onClick={printPdf}
-                className="save-filled-pdf-button"
-                title="Print filled PDF with variable values"
+                onClick={loadBoundingBoxData}
+                className="load-button"
+                title="Load bounding box data from a JSON file"
               >
-                Print PDF
+                Load Bounding Box Data
               </button>
-            )}
 
-            {/* Toggle view button */}
-            {parsedResults && variableMappings.length > 0 && (
-              <button 
-                onClick={toggleVariableView}
-                className="toggle-view-button"
-                title="Toggle between variables and bounding boxes"
-              >
-                {showVariables ? 'Show Bounding Boxes' : 'Show Variables'}
-              </button>
-            )}
+              {variableFields.length > 0 && (
+                <button 
+                  onClick={printPdf}
+                  className="save-filled-pdf-button"
+                  title="Print filled PDF with variable values"
+                >
+                  Print PDF
+                </button>
+              )}
 
-            {/* Success message notification */}
-            {saveSuccess && (
-              <div className="success-message">
-                Bounding box data saved successfully!
-              </div>
-            )}
-          </div>
+              {parsedResults && variableMappings.length > 0 && (
+                <button 
+                  onClick={toggleVariableView}
+                  className="toggle-view-button"
+                  title="Toggle between variables and bounding boxes"
+                >
+                  {showVariables ? 'Show Bounding Boxes' : 'Show Variables'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Success message notification */}
+          {saveSuccess && (
+            <div className="success-message">
+              Operation completed successfully!
+            </div>
+          )}
           
           {error && (
             <div className="error-message">

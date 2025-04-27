@@ -77,3 +77,389 @@
   font-weight: 400;
   text-align: center;
 }
+
+/* New styles for tools-based layout */
+.sidebar-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.sidebar-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+  color: #fff;
+}
+
+.sidebar-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.nav-item:hover {
+  background-color: #333;
+}
+
+.nav-item.active {
+  background-color: #3f51b5;
+}
+
+.nav-icon {
+  margin-right: 10px;
+  font-size: 18px;
+}
+
+.saved-pdfs-section {
+  border-top: 1px solid #444;
+  padding-top: 20px;
+  margin-top: 10px;
+}
+
+.saved-pdfs-section h3 {
+  font-size: 1rem;
+  margin: 0 0 10px 0;
+}
+
+.saved-pdfs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.saved-pdf-item {
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #333;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.saved-pdf-item:hover {
+  background-color: #444;
+}
+
+.pdf-name {
+  font-weight: 500;
+  margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdf-date {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+/* Tools landing page */
+.tools-landing-page {
+  padding: 40px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.tools-landing-page h1 {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.tools-landing-page p {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #666;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.tool-card {
+  background: white;
+  border-radius: 8px;
+  padding: 25px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.tool-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+}
+
+.tool-icon {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.tool-card h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.2rem;
+}
+
+.tool-card p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+/* Tool container styling */
+.tool-container {
+  display: flex;
+  height: 100%;
+  position: relative;
+}
+
+.tool-container > .pdf-processor {
+  flex: 1;
+  max-width: calc(100% - 300px);
+}
+
+.tool-side-controls {
+  width: 300px;
+  background-color: #fff;
+  border-left: 1px solid #ddd;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.additional-controls {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-fields-button,
+.print-button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-fields-button {
+  background-color: #2196f3;
+  color: white;
+}
+
+.map-fields-button:hover {
+  background-color: #1976d2;
+}
+
+.map-fields-button:disabled {
+  background-color: #b0bec5;
+  cursor: not-allowed;
+}
+
+.print-button {
+  background-color: #4caf50;
+  color: white;
+}
+
+.print-button:hover {
+  background-color: #388e3c;
+}
+
+.print-button:disabled {
+  background-color: #c8e6c9;
+  cursor: not-allowed;
+}
+
+.variable-editor-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.variable-editor-container h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.variable-editor-container p {
+  color: #666;
+  margin-bottom: 30px;
+}
+
+.variable-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+}
+
+.apply-to-pdf-button {
+  padding: 10px 20px;
+  background-color: #3f51b5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.apply-to-pdf-button:hover {
+  background-color: #303f9f;
+}
+
+.control-section {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.control-section:last-child {
+  border-bottom: none;
+}
+
+.control-section h3 {
+  font-size: 1rem;
+  margin: 0 0 10px 0;
+  color: #333;
+  font-weight: 600;
+}
+
+.file-upload {
+  margin-bottom: 10px;
+}
+
+.file-upload input[type="file"] {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.control-section button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.control-section button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.control-section button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.process-button {
+  background-color: #ff9800;
+  color: white;
+}
+
+.process-button:hover:not(:disabled) {
+  background-color: #f57c00;
+}
+
+.process-button:disabled {
+  background-color: #ffe0b2;
+  cursor: not-allowed;
+}
+
+.map-fields-button {
+  background-color: #2196f3;
+  color: white;
+}
+
+.map-fields-button:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+
+.map-fields-button:disabled {
+  background-color: #bbdefb;
+  cursor: not-allowed;
+}
+
+.toggle-view-button {
+  background-color: #9c27b0;
+  color: white;
+}
+
+.toggle-view-button:hover:not(:disabled) {
+  background-color: #7b1fa2;
+}
+
+.toggle-view-button:disabled {
+  background-color: #e1bee7;
+  cursor: not-allowed;
+}
+
+.save-button {
+  background-color: #4caf50;
+  color: white;
+}
+
+.save-button:hover:not(:disabled) {
+  background-color: #388e3c;
+}
+
+.save-button:disabled {
+  background-color: #c8e6c9;
+  cursor: not-allowed;
+}
+
+.load-button {
+  background-color: #03a9f4;
+  color: white;
+}
+
+.load-button:hover:not(:disabled) {
+  background-color: #0288d1;
+}
+
+.load-button:disabled {
+  background-color: #b3e5fc;
+  cursor: not-allowed;
+}
+
+.print-button {
+  background-color: #673ab7;
+  color: white;
+}
+
+.print-button:hover:not(:disabled) {
+  background-color: #512da8;
+}
+
+.print-button:disabled {
+  background-color: #d1c4e9;
+  cursor: not-allowed;
+}
