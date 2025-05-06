@@ -470,15 +470,8 @@ export const printFilledPdf = async (
             cursor: pointer;
             border-radius: 4px;
           }
-          .error-message {
-            color: red;
-            font-weight: bold;
-            padding: 10px;
-            background-color: #ffeeee;
-            border: 1px solid red;
-            margin: 20px;
-          }
         </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
       </head>
       <body>
         <div class="controls">
@@ -489,96 +482,18 @@ export const printFilledPdf = async (
         <div id="pdf-container"></div>
         
         <script>
-          // Error handler
-          window.onerror = function(message, source, lineno, colno, error) {
-            console.error('PDF Error:', message, error);
-            document.getElementById('pdf-container').innerHTML = '<div class="error-message">Error loading PDF: ' + message + '</div>';
-            return true;
-          };
+          // Set up PDF.js worker
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+          // Fields by page from the React app
+          const fieldsByPage = ${fieldsByPageJSON};
           
-          // Handle potentially invalid PDF URL by using fetch with proper error handling
-          async function loadPdf() {
+          async function renderPdf() {
             try {
-              // Use fetch to get the PDF with proper error handling for CORS and other issues
-              const response = await fetch('${pdfUrl}', {
-                method: 'GET',
-                mode: 'cors',
-                cache: 'no-cache',
-                credentials: 'same-origin',
-                headers: {
-                  'Content-Type': 'application/pdf'
-                }
-              });
-              
-              if (!response.ok) {
-                throw new Error('Failed to load PDF: ' + response.status);
-              }
-              
-              const pdfData = await response.arrayBuffer();
-              // Now load the PDF using PDF.js from the array buffer
-              renderPdfFromData(pdfData);
-            } catch (error) {
-              console.error('Error fetching PDF:', error);
-              document.getElementById('pdf-container').innerHTML = '<div class="error-message">Error loading PDF: ' + error.message + '</div>';
-              
-              // Fallback to direct loading if fetch fails
-              try {
-                loadPdfDirectly();
-              } catch (directError) {
-                console.error('Direct PDF loading failed:', directError);
-              }
-            }
-          }
-          
-          // Try direct loading as fallback
-          function loadPdfDirectly() {
-            // Dynamically load PDF.js if not already loaded
-            if (typeof pdfjsLib === 'undefined') {
-              const script = document.createElement('script');
-              script.src = '/pdfjs/pdf.min.js';
-              script.onload = () => {
-                if (window.pdfjsLib) {
-                  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
-                  renderPdfFromUrl();
-                }
-              };
-              document.head.appendChild(script);
-            } else {
-              // Make sure worker is set
-              if (pdfjsLib.GlobalWorkerOptions) {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
-              }
-              renderPdfFromUrl();
-            }
-          }
-          
-          // Render from URL
-          async function renderPdfFromUrl() {
-            try {
-              // Load the PDF document - direct method as fallback
+              // Load the PDF document
               const loadingTask = pdfjsLib.getDocument('${pdfUrl}');
-              renderPdf(await loadingTask.promise);
-            } catch (error) {
-              console.error('Error in direct PDF loading:', error);
-              document.getElementById('pdf-container').innerHTML = '<div class="error-message">Failed to load PDF directly: ' + error.message + '</div>';
-            }
-          }
-          
-          // Render from binary data
-          async function renderPdfFromData(data) {
-            try {
-              // Load PDF from binary data
-              const loadingTask = pdfjsLib.getDocument({data});
-              renderPdf(await loadingTask.promise);
-            } catch (error) {
-              console.error('Error rendering PDF from data:', error);
-              document.getElementById('pdf-container').innerHTML = '<div class="error-message">Error rendering PDF: ' + error.message + '</div>';
-            }
-          }
-          
-          // Main PDF rendering function
-          async function renderPdf(pdf) {
-            try {
+              const pdf = await loadingTask.promise;
+              
               const container = document.getElementById('pdf-container');
               const totalPages = pdf.numPages;
               
@@ -649,11 +564,8 @@ export const printFilledPdf = async (
             }
           }
           
-          // Fields by page from the React app
-          const fieldsByPage = ${fieldsByPageJSON};
-          
           // Start the PDF loading process
-          window.addEventListener('DOMContentLoaded', loadPdf);
+          window.addEventListener('DOMContentLoaded', renderPdf);
         </script>
       </body>
       </html>

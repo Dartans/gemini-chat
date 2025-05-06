@@ -7,10 +7,10 @@ if (typeof pdfjsLib === 'undefined') {
   window.pdfjsLib = window.pdfjsLib || {};
 }
 
-// Set the worker source path
+// Set the worker source path - using package.json version (3.11.174)
 if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions?.workerSrc) {
   window.pdfjsLib.GlobalWorkerOptions = window.pdfjsLib.GlobalWorkerOptions || {};
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdfjs/pdf.worker.min.js';
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 }
 
 // Handle any initialization errors

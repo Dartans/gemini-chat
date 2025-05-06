@@ -12,23 +12,23 @@
   }
   
   .message.user {
-    background-color: #dcf8c6; /* Light green for user messages */
-    color: #333;
+    background-color: var(--user-message-bg); 
+    color: var(--text-primary);
     float: right;
     text-align: right;
     border-bottom-right-radius: 0;
   }
   
   .message.ai {
-    background-color: #f0f0f0; /* Light gray for AI messages */
-    color: #333;
+    background-color: var(--system-message-bg);
+    color: var(--text-primary);
     float: left;
     text-align: left;
     border-bottom-left-radius: 0;
   }
 
   .message.selected {
-    box-shadow: 0 0 0 2px #0078d4, 0 0 10px rgba(0, 120, 212, 0.4);
+    box-shadow: 0 0 0 2px var(--primary-color), 0 0 10px rgba(0, 120, 212, 0.4);
     transform: scale(1.02);
     z-index: 10;
   }
@@ -39,7 +39,7 @@
   
   .message-timestamp {
     font-size: 0.7rem;
-    color: #777;
+    color: var(--text-tertiary);
     margin-top: 5px;
     display: block; /* Ensure timestamp is on a new line */
   }

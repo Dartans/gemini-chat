@@ -1,3 +1,49 @@
+:root {
+  /* Primary colors */
+  --primary-color: #3f51b5;
+  --primary-dark: #303f9f;
+  --primary-light: #c5cae9;
+  
+  /* Secondary colors */
+  --secondary-color: #ff9800;
+  --secondary-dark: #f57c00;
+  --secondary-light: #ffe0b2;
+  
+  /* Accent colors */
+  --accent-color: #2196f3;
+  --accent-dark: #1976d2;
+  --accent-light: #bbdefb;
+  
+  /* Success/Error/Warning */
+  --success-color: #4caf50;
+  --success-dark: #388e3c;
+  --success-light: #c8e6c9;
+  --error-color: #dc3545;
+  --error-light: #f8d7da;
+  --warning-color: #ff9800;
+  
+  /* Neutral colors */
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --background: #f4f4f4;
+  --surface: #ffffff;
+  --border: #dddddd;
+  --divider: #eeeeee;
+  
+  /* Chat-specific colors */
+  --user-message-bg: #e6f7ff;
+  --user-message-border: #d9edf7;
+  --system-message-bg: #f0f0f0;
+  --system-message-border: #ddd;
+  
+  /* Sidebar colors */
+  --sidebar-bg: #222;
+  --sidebar-text: #fff;
+  --sidebar-item-hover: #333;
+  --sidebar-item-active: #3f51b5;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -5,6 +51,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color: var(--text-primary);
 }
 
 code {
